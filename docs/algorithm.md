@@ -77,7 +77,7 @@ Base seconds, scaled by 1, 1, 1.5, 2 for bands 0 to 3:
 
 Twenty probes in a fixed order. Each starts at band 1, climbs to 2 and 3 on correct answers, drops to a single band 0 item on a band 1 miss, and ends on any band 2 or 3 miss. Skips count as wrong. Finish writes the probed level per skill, seeds stability 3 days for level 1 and up, stores the baseline report, and picks the first target.
 
-The probes run in 4 parts of 5. Each part applies the levels gathered so far and stops, so a learner can place in short sittings. After part 1 the app counts the learner as having a starting point and offers sessions; the baseline report still waits for part 4.
+The probes run in 4 parts of 5. Part 1 always runs standalone from Today. Once it is in, the remaining parts fold into the daily session as a 5 minute first block, and practice shrinks by 5 minutes. A completed part applies its levels right away, re-picks the session target, and ends the block at that question boundary. If the 5 minutes end mid-part, the part resumes in the next session. The baseline report still waits for part 4.
 
 The 10 minute plan runs recall for 2 minutes and practice for 8, with no learn, timed, or review phase.
 

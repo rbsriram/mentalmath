@@ -1,6 +1,9 @@
 // The 30-minute daily session state machine.
 //
 // Phase budgets: recall 3, learn 7, practice 12, timed 5, review 3 minutes.
+// While diagnostic parts remain, the session opens with a 5 minute
+// 'diagnostic' phase and practice shrinks by 5. The diagnostic phase is
+// assessment: no feedback, no misses, no slow tracking.
 // A phase never cuts a question in the middle: it only ends between
 // questions. The review phase drains the review queue (today's misses,
 // regenerated with fresh seeds) and ends early when the queue is empty.
@@ -15,12 +18,25 @@ import { seedFor, type Rng } from '../math/rng';
 import type { Attempt } from './attempt';
 import { localDay, newRec } from './model';
 import { factFamilyOf } from '../content/facts';
+import {
+  answerDiagnostic,
+  applyDiagnosticPart,
+  currentItem,
+  partComplete,
+  partsDone,
+} from './diagnostic';
 import { pickQuestion, type Bucket } from './scheduler';
 import { chooseTarget } from './scheduler';
 import { recordOutcome, type SessionSummary, type State } from './state';
 import { speedTargetMs } from './targets';
 
-export type PhaseKind = 'recall' | 'learn' | 'practice' | 'timed' | 'review';
+export type PhaseKind =
+  | 'recall'
+  | 'learn'
+  | 'practice'
+  | 'timed'
+  | 'review'
+  | 'diagnostic';
 
 export interface Phase {
   kind: PhaseKind;
@@ -88,6 +104,24 @@ export function planSession(
     kind,
     minutes,
   }));
+  // Parts 2 to 4 of the diagnostic fold into the daily session as the
+  // first block. Part 1 always runs standalone before a starting point.
+  const diagPending =
+    state.diagnostic !== null &&
+    !state.diagnostic.done &&
+    partsDone(state.diagnostic) >= 1;
+  if (diagPending) {
+    if (short) {
+      budgets = [
+        { kind: 'diagnostic', minutes: 5 },
+        { kind: 'practice', minutes: 5 },
+      ];
+    } else {
+      budgets = [{ kind: 'diagnostic', minutes: 5 }, ...budgets];
+      const practice = budgets.find((b) => b.kind === 'practice')!;
+      practice.minutes -= 5;
+    }
+  }
   if (!short && target === null) {
     const learn = budgets.find((b) => b.kind === 'learn')!;
     const practice = budgets.find((b) => b.kind === 'practice')!;
@@ -170,6 +204,34 @@ export function nextQuestion(
   let counter = s.counter;
   let reviewQueue = s.reviewQueue;
 
+  if (phase.kind === 'diagnostic') {
+    const diag = state.diagnostic;
+    const item = diag === null || diag.done ? null : currentItem(diag);
+    if (item === null) {
+      // Nothing left to probe: end this phase and keep going.
+      const s2 = advanceIfOver({
+        ...s,
+        phases: s.phases.map((p, i) =>
+          i === s.phaseIndex ? { ...p, elapsedMs: p.budgetMs } : p,
+        ),
+      });
+      if (s2.completed) return s2;
+      return nextQuestion(state, s2, rng, now);
+    }
+    return {
+      ...s,
+      current: {
+        templateId: item.templateId,
+        seed: item.seed,
+        band: item.band,
+        bucket: 'target', // unused in assessment phases
+        transfer: false,
+      },
+      recentPrompts: [...s.recentPrompts, item.prompt].slice(-20),
+      lastTemplateId: item.templateId,
+    };
+  }
+
   if (phase.kind === 'review') {
     if (reviewQueue.length === 0) {
       // Queue drained: the review phase ends and we continue.
@@ -249,6 +311,9 @@ export interface AnswerResult {
   session: Session;
   attempt: Attempt | null;
   result: CheckResult | null;
+  // Set when the last diagnostic answer finished the run: the caller must
+  // finishDiagnostic with the attempt log (baseline needs it).
+  needsFinish?: boolean;
 }
 
 export function answer(
@@ -267,6 +332,38 @@ export function answer(
   }
   const { transfer } = session.current;
   const phase = session.phases[session.phaseIndex]!;
+
+  if (phase.kind === 'diagnostic' && state.diagnostic) {
+    // Assessment: record through the diagnostic staircase, no feedback,
+    // no misses or slow entries. A completed part applies immediately and
+    // ends this phase at the question boundary.
+    const out = answerDiagnostic(state, state.diagnostic, raw, ms, now);
+    let st2 = out.state;
+    let ses: Session = {
+      ...session,
+      current: null,
+      answered: session.answered + 1,
+      correct: session.correct + (out.result.correct ? 1 : 0),
+    };
+    if (partComplete(out.diagnostic) && !out.diagnostic.done) {
+      st2 = applyDiagnosticPart(st2, out.diagnostic, now);
+      ses = {
+        ...ses,
+        target: st2.target,
+        phases: ses.phases.map((p, i) =>
+          i === ses.phaseIndex ? { ...p, elapsedMs: p.budgetMs } : p,
+        ),
+      };
+    }
+    return {
+      state: st2,
+      session: ses,
+      attempt: out.attempt,
+      result: out.result,
+      needsFinish: out.diagnostic.done,
+    };
+  }
+
   const outcome = recordOutcome(state, question, raw, ms, now, phase.kind, {
     transfer,
     sessionId: session.id,

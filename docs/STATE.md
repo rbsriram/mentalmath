@@ -7,7 +7,7 @@ Last updated: 2026-10-24 (evening)
 
 ## Where it is
 
-Built on 2026-10-24 from `docs/mental-math-devin-brief.md`. The app runs, builds, and installs as a PWA. The full loop works end to end in a production build driven by headless Chrome: the diagnostic (4 parts of about 5 minutes; a plan appears after part 1), a 30-minute session as five stoppable blocks or a 10-minute short session, the lesson card, the Today summary, Knowledge detail pages, and Progress. A subtle corner countdown shows the time left in the current block. The default look is light with the user's three pastel illustrations (`docs/media/bg-*.png`, shipped as small WebP files in `public/bg/`) behind translucent surfaces; dark theme stays plain (`docs/DECISIONS.md` #7). The state document is at version 2. Keys: Enter submits and continues, Space on an empty box skips, r shows the route, Esc pauses or stops, Option+1 to 4 switch tabs, ? lists the keys. 369 Vitest tests pass, including a template sweep of about 90,000 seeded questions against independent oracles and a scripted-learner simulation of a diagnostic plus three sessions.
+Built on 2026-10-24 from `docs/mental-math-devin-brief.md`. The app runs, builds, and installs as a PWA. The full loop works end to end in a production build driven by headless Chrome: the diagnostic (4 parts of about 5 minutes; a plan appears after part 1, and parts 2 to 4 run as the first block of the daily session), a 30-minute session as stoppable blocks or a 10-minute short session, Start and Stop as the only run controls (no pause), a focus mode that hides the tabs during a run, the lesson card, the Today summary, Knowledge detail pages, and Progress. A subtle corner countdown shows the time left in the current block. The default look is light with the user's three pastel illustrations (`docs/media/bg-*.png`, shipped as small WebP files in `public/bg/`) behind translucent surfaces; dark theme stays plain (`docs/DECISIONS.md` #7). The state document is at version 2. Keys: Enter submits and continues, Space on an empty box skips, r shows the route, Esc pauses or stops, Option+1 to 4 switch tabs, ? lists the keys. 378 Vitest tests pass, including a template sweep of about 90,000 seeded questions against independent oracles and a scripted-learner simulation of a diagnostic plus three sessions.
 
 Not yet done by a human: a real 30-minute session on a phone, and a monthly benchmark run (the code path is tested in isolation, not in the browser).
 
@@ -34,7 +34,6 @@ A static PWA. Svelte 5 + TypeScript + Vite 8, runtime dependency `svelte` only (
 - The diagnostic staircase ends most probes on a wrong answer, so freshly probed skills show as "learning" and are drilled as fragile prerequisites in the first sessions. This washes out after a few days.
 - The bundle is about 58 KB gzipped. Most of it is content and templates; no code splitting yet.
 - Only `^2` and `^3` in method text use Unicode superscripts; other exponents print as `2^10`.
-- Pending diagnostic parts are offered on Today ("Continue diagnostic"); they are not folded into sessions automatically.
 
 ## Next / in flight
 

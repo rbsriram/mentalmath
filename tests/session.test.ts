@@ -15,6 +15,7 @@ import {
 } from '../src/lib/learn/session';
 import { SKILLS } from '../src/lib/content/skills';
 import { newState, type State } from '../src/lib/learn/state';
+import { applyDiagnosticPart, answerDiagnostic, currentItem, startDiagnostic } from '../src/lib/learn/diagnostic';
 import { newRec, type Rec } from '../src/lib/learn/model';
 import { displayAnswer } from '../src/lib/math/format';
 import { createRng } from '../src/lib/math/rng';
@@ -265,5 +266,82 @@ describe('short plan and resume', () => {
     expect(resumed.phaseIndex).toBe(0);
     expect(resumed.current).toEqual(s.current);
     expect(currentQuestion(resumed)!.prompt).toBe(q.prompt);
+  });
+});
+
+describe('diagnostic parts inside the session', () => {
+  function stateWithPartDone(parts: number): { state: State; now: number } {
+    let state = newState(T0);
+    const started = startDiagnostic(state, T0);
+    state = started.state;
+    let diag = started.diagnostic;
+    let now = T0;
+    for (let p = 0; p < parts; p++) {
+      while (!diag.partBoundary && !diag.done) {
+        const q = currentItem(diag)!;
+        const out = answerDiagnostic(state, diag, displayAnswer(q.answer), 900, now);
+        state = out.state;
+        diag = out.diagnostic;
+        now += 500;
+      }
+      state = { ...applyDiagnosticPart(state, diag, now), diagnostic: applyDiagnosticPart(state, diag, now).diagnostic };
+      diag = { ...diag, partBoundary: false };
+      state = { ...state, diagnostic: diag };
+    }
+    return { state, now };
+  }
+
+  it('a pending part prepends a 5-minute diagnostic phase (30 min total)', () => {
+    const { state, now } = stateWithPartDone(1);
+    const s = planSession(state, now, 1);
+    expect(s.phases.map((p) => p.kind)).toEqual([
+      'diagnostic', 'recall', 'learn', 'practice', 'timed', 'review',
+    ]);
+    expect(s.phases[0]!.budgetMs).toBe(5 * MIN);
+    const total = s.phases.reduce((x, p) => x + p.budgetMs, 0);
+    expect(total).toBe(30 * MIN);
+  });
+
+  it('short plan with a pending part is diagnostic 5 + practice 5', () => {
+    const { state, now } = stateWithPartDone(1);
+    const s = planSession(state, now, 1, { short: true });
+    expect(s.phases.map((p) => p.kind)).toEqual(['diagnostic', 'practice']);
+    expect(s.phases.reduce((x, p) => x + p.budgetMs, 0)).toBe(10 * MIN);
+  });
+
+  it('no diagnostic phase when the diagnostic is done or before part 1', () => {
+    const fresh = newState(T0);
+    expect(planSession(fresh, T0, 1).phases.map((p) => p.kind)).not.toContain('diagnostic');
+    const { state } = stateWithPartDone(0); // in-flight, no part done
+    // stateWithPartDone(0) leaves an in-flight diag with 0 parts
+    // (startDiagnostic ran but no part applied) -> still no phase.
+    // Simulate a finished diagnostic instead: mark done.
+    const done = { ...state, diagnostic: null, diagnosticDone: true };
+    expect(planSession(done, T0, 1).phases.map((p) => p.kind)).not.toContain('diagnostic');
+  });
+
+  it('a part ends inside the session and the target re-picks', () => {
+    const { state, now } = stateWithPartDone(1);
+    const rng = createRng(3);
+    let ses = planSession(state, now, 7);
+    expect(ses.phases[0]!.kind).toBe('diagnostic');
+    ses = nextQuestion(state, ses, rng, now);
+    expect(ses.current).not.toBeNull();
+    // answer until the boundary: the phase should mark elapsed=budget
+    let st = state;
+    let guard = 0;
+    while (ses.phases[0]!.elapsedMs < ses.phases[0]!.budgetMs && guard++ < 30) {
+      const out = answer(st, ses, 'x', 800, now + guard * 500);
+      st = out.state;
+      ses = out.session;
+      if (ses.current === null && ses.phases[0]!.elapsedMs >= ses.phases[0]!.budgetMs) break;
+      if (ses.current === null) ses = nextQuestion(st, ses, rng, now + guard * 500);
+    }
+    // The diagnostic part completed -> applyDiagnosticPart ran -> target matches state.target
+    expect(ses.target).toBe(st.target);
+    expect(st.diagnostic!.probeIndex).toBe(10);
+    // advanceIfOver moves to the next phase at the boundary
+    const adv = advanceIfOver(ses);
+    expect(adv.phaseIndex).toBe(1);
   });
 });

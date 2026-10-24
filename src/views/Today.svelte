@@ -33,7 +33,6 @@
   );
 
   // Placement status.
-  const diagParts = $derived(st.diagnostic ? partsDone(st.diagnostic) : 0);
   const diagPending = $derived(st.diagnostic !== null && !st.diagnosticDone);
   const started = $derived(hasStartingPoint(st));
 
@@ -50,7 +49,6 @@
   );
 
   let btnStart = $state<HTMLButtonElement | null>(null);
-  let btnContinue = $state<HTMLButtonElement | null>(null);
   let btnDiag = $state<HTMLButtonElement | null>(null);
 
   onMount(() => {
@@ -59,7 +57,7 @@
       s.session !== null && !s.session.completed && s.session.date === localDay(now);
     const pending = s.diagnostic !== null && !s.diagnosticDone;
     if (inProgress) btnStart?.focus();
-    else if (pending) (btnContinue ?? btnDiag)?.focus();
+    else if (pending) btnDiag?.focus();
     else (btnStart ?? btnDiag)?.focus();
   });
 
@@ -93,20 +91,6 @@
     </button>
   </div>
 {:else}
-  {#if diagPending}
-    <div class="card">
-      <p><strong>Continue diagnostic</strong>, {4 - diagParts} parts left</p>
-      <ul>
-        {#each PART_LABELS.slice(diagParts) as label}
-          <li>{label}</li>
-        {/each}
-      </ul>
-      <button bind:this={btnContinue} class="secondary" onclick={() => startPractice('diagnostic')}>
-        Continue
-      </button>
-    </div>
-  {/if}
-
   {#if benchmarkDue(st, now)}
     <div class="card">
       <p><strong>Monthly benchmark is due.</strong></p>
@@ -147,7 +131,11 @@
         {#each plan.phases as phase}
           {#if phase.budgetMs > 0}
             <li>
-              {fmtPhase(phase.kind)}: {Math.round(phase.budgetMs / 60000)} min
+              {#if phase.kind === 'diagnostic' && st.diagnostic}
+                Diagnostic part {Math.min(4, partsDone(st.diagnostic) + 1)} of 4: {Math.round(phase.budgetMs / 60000)} min
+              {:else}
+                {fmtPhase(phase.kind)}: {Math.round(phase.budgetMs / 60000)} min
+              {/if}
               {#if phase.kind === 'learn' && plan.target}
                 <span class="muted">
                   ({skillName.get(plan.target) ?? plan.target})

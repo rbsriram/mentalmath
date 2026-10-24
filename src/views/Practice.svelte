@@ -267,10 +267,14 @@
       }
       if (ses.paused) ses = resume(ses);
       session = ses;
-      if (session.current === null) {
+      // A diagnostic first block announces itself with a block card like
+      // every later phase change, so hold off serving until Continue.
+      const diagFirst =
+        session.phaseIndex === 0 && session.phases[0]?.kind === 'diagnostic';
+      seenPhase = diagFirst ? -1 : session.phaseIndex;
+      if (session.current === null && !diagFirst) {
         session = nextQuestion(app.state!, session, rng, now);
       }
-      seenPhase = session.phaseIndex;
       commit({ ...app.state!, session });
     } else if (m === 'diagnostic') {
       if (s.diagnostic) diag = s.diagnostic;
@@ -343,6 +347,16 @@
       session = out.session;
       commit(out.state);
       if (out.attempt) logAttempt(out.attempt);
+      if (out.needsFinish) {
+        // The diagnostic finished inside the session: write the baseline
+        // but keep the session running.
+        void (async () => {
+          const attempts = await loadAttempts();
+          const d = app.state!.diagnostic!;
+          const fin = finishDiagnostic(app.state!, d, attempts, Date.now());
+          commit(fin.state);
+        })();
+      }
       return out.result ?? { correct: false };
     }
     if (mode === 'diagnostic' && diag) {
@@ -554,8 +568,12 @@
     </div>
   {:else if interstitial !== null && phase}
     <div class="card">
-      <h3 style="margin-top:0">{cap(phase.kind)}</h3>
-      <p class="muted">{Math.round(phase.budgetMs / 60000)} minutes</p>
+      <h3 style="margin-top:0">
+        {phase.kind === 'diagnostic' && st.diagnostic
+          ? `Diagnostic, part ${Math.min(4, partsDone(st.diagnostic) + 1)} of 4`
+          : cap(phase.kind)}
+      </h3>
+      <p class="muted">{Math.round(phase.budgetMs / 60000)} min</p>
       {#each session.slow.slice(slowSeen) as slow}
         <p class="muted">
           {skillName.get(slow.skill) ?? slow.skill} was slower than target.
@@ -569,7 +587,12 @@
     <MethodCard method={learnMethod} />
     <button onclick={lessonContinue}>Continue</button>
   {:else if question}
-    <Question {question} {onSubmit} {onNext} />
+    <Question
+      {question}
+      {onSubmit}
+      {onNext}
+      skippable={phase?.kind === 'diagnostic'}
+    />
   {:else}
     <div class="card"><p class="muted">Preparing...</p></div>
   {/if}

@@ -4,8 +4,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerDiagnostic,
+  applyDiagnosticPart,
   currentItem,
   finishDiagnostic,
+  partsDone,
   startDiagnostic,
   type DiagnosticState,
 } from '../src/lib/learn/diagnostic';
@@ -134,5 +136,127 @@ describe('simulated learner', () => {
       expect(state.sessions.at(-1)!.answered).toBe(session.answered);
     }
     expect(state.sessions.length).toBe(3);
+  });
+});
+
+describe('diagnostic parts fold into sessions', () => {
+  // Part 1 runs standalone, then parts 2-4 arrive as the first block of
+  // the next daily sessions.
+  function stateAfterPart1(): { state: State; attempts: Attempt[]; now: number } {
+    let state = newState(T0);
+    const started = startDiagnostic(state, T0);
+    state = started.state;
+    let diag = started.diagnostic;
+    const attempts: Attempt[] = [];
+    let now = T0;
+    while (!diag.partBoundary && !diag.done) {
+      const q = currentItem(diag)!;
+      const out = answerDiagnostic(state, diag, displayAnswer(q.answer), 1500, now);
+      state = out.state;
+      diag = out.diagnostic;
+      attempts.push(out.attempt);
+      now += 800;
+    }
+    state = applyDiagnosticPart(state, diag, now);
+    expect(partsDone(state.diagnostic!)).toBe(1);
+    return { state, attempts, now };
+  }
+
+  it('a pending part runs as the first block, completes, re-picks target', () => {
+    let { state, attempts, now } = stateAfterPart1();
+    const rng = createRng(77);
+    let session = planSession(state, now, 11);
+    expect(session.phases[0]!.kind).toBe('diagnostic');
+    session = nextQuestion(state, session, rng, now);
+    expect(currentQuestion(session)).not.toBeNull();
+    expect(session.phases[0]!.kind).toBe('diagnostic');
+
+    // Answer until the part boundary lands.
+    let guard = 0;
+    while (partsDone(state.diagnostic!) === 1 && guard++ < 40) {
+      const q = currentQuestion(session)!;
+      const out = answer(state, session, displayAnswer(q.answer), 1500, now + guard * 700);
+      state = out.state;
+      session = out.session;
+      attempts.push(out.attempt!);
+      if (session.current === null) {
+        if (session.phaseIndex > 0) break;
+        session = nextQuestion(state, session, rng, now);
+      }
+    }
+    expect(partsDone(state.diagnostic!)).toBe(2);
+    // The phase ended right after the part and the target re-picked.
+    expect(session.phases[0]!.elapsedMs).toBe(session.phases[0]!.budgetMs);
+    expect(session.target).toBe(state.target);
+  });
+
+  it('a 5-minute budget mid-part resumes in the next plan', () => {
+    let { state, attempts, now } = stateAfterPart1();
+    const rng = createRng(5);
+    let session = planSession(state, now, 3);
+    session = nextQuestion(state, session, rng, now);
+    // Two answers, then the budget runs out.
+    for (let i = 0; i < 2; i++) {
+      const q = currentQuestion(session)!;
+      const out = answer(state, session, displayAnswer(q.answer), 1500, now + i * 700);
+      state = out.state;
+      session = out.session;
+      attempts.push(out.attempt!);
+      session = nextQuestion(state, session, rng, now);
+    }
+    session = tick(session, 300_000);
+    // The item on screen still answers (the budget ends at a boundary).
+    const q3 = currentQuestion(session)!;
+    const out3 = answer(state, session, displayAnswer(q3.answer), 1500, now);
+    state = out3.state;
+    session = out3.session;
+    attempts.push(out3.attempt!);
+    session = nextQuestion(state, session, rng, now); // boundary: phase ends
+    expect(session.phaseIndex).toBe(1);
+    expect(state.diagnostic!.probeIndex).toBeGreaterThanOrEqual(5);
+    const stillInFlight = state.diagnostic!;
+    // Next day's plan puts the diagnostic block first again, same item.
+    const next = planSession(state, now + DAY, 4);
+    expect(next.phases[0]!.kind).toBe('diagnostic');
+    const s2 = nextQuestion(state, next, rng, now);
+    expect(currentQuestion(s2)!.prompt).toBe(currentItem(stillInFlight)!.prompt);
+    void attempts;
+  });
+
+  it('parts 2-4 finish across sessions and the baseline is written', () => {
+    let { state, attempts, now } = stateAfterPart1();
+    const rng = createRng(99);
+    let day = 0;
+    while (!state.diagnosticDone && day++ < 10) {
+      const dayStart = now + day * DAY;
+      let session = planSession(state, dayStart, 100 + day);
+      let guard = 0;
+      while (!session.completed && guard++ < 400) {
+        if (session.current === null) {
+          const phase = session.phases[session.phaseIndex];
+          if (phase?.kind === 'learn' && !session.lessonShown && session.target) {
+            const marked = markLessonShown(state, session, dayStart);
+            state = marked.state;
+            session = marked.session;
+          }
+          session = nextQuestion(state, session, rng, dayStart);
+          if (session.current === null) break;
+        }
+        const q = currentQuestion(session)!;
+        const out = answer(state, session, displayAnswer(q.answer), 1200, dayStart + guard * 700);
+        state = out.state;
+        session = out.session;
+        if (out.attempt) attempts.push(out.attempt);
+        if (out.needsFinish) {
+          const fin = finishDiagnostic(state, state.diagnostic!, attempts, dayStart);
+          state = fin.state;
+        }
+        session = tick(session, 10_000);
+      }
+      state = finishSession(state, session, dayStart + guard * 10_000);
+    }
+    expect(state.diagnosticDone).toBe(true);
+    expect(state.baseline).not.toBeNull();
+    expect(state.sessions.length).toBeGreaterThanOrEqual(3);
   });
 });

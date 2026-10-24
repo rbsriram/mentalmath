@@ -248,3 +248,28 @@ describe('part labels', () => {
     }
   });
 });
+
+describe('part boundary resumption', () => {
+  it('applyDiagnosticPart clears partBoundary so the next part can continue', () => {
+    let state = newState(T0);
+    const started = startDiagnostic(state, T0);
+    state = started.state;
+    let diag = started.diagnostic;
+    // finish part 1: answer all correctly
+    let now = T0;
+    while (!diag.partBoundary && !diag.done) {
+      const q = currentItem(diag)!;
+      const out = answerDiagnostic(state, diag, displayAnswer(q.answer), 1000, now);
+      state = out.state;
+      diag = out.diagnostic;
+      now += 1000;
+    }
+    expect(diag.partBoundary).toBe(true);
+    const applied = applyDiagnosticPart(state, diag, now);
+    expect(applied.diagnostic!.partBoundary).toBe(false);
+    // The next item is the first probe of part 2.
+    const item = currentItem(applied.diagnostic!);
+    expect(item).not.toBeNull();
+    expect(item!.templateId).toBe(PROBES[5]!.templateId);
+  });
+});

@@ -213,7 +213,13 @@ export function applyDiagnosticPart(
     skills[probe.skill] = next;
   });
   const withSkills: State = { ...state, skills };
-  return { ...withSkills, target: chooseTarget(withSkills) };
+  // The boundary flag clears here so a resumed run is not bounced back to
+  // Today the moment it mounts.
+  return {
+    ...withSkills,
+    target: chooseTarget(withSkills),
+    diagnostic: { ...diag, partBoundary: false },
+  };
 }
 
 // The learner has a starting point once the diagnostic is done or the
