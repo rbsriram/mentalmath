@@ -100,17 +100,19 @@
 {/if}
 
 <main>
-  {#if app.error}
-    <div class="card"><p class="bad">Storage failed: {app.error}</p></div>
-  {:else if !app.ready || app.state === null}
-    <p class="muted">Loading...</p>
-  {:else if app.view === 'practice'}
-    <Practice />
-  {:else if app.view === 'knowledge'}
-    <Knowledge />
-  {:else if app.view === 'progress'}
-    <Progress />
-  {:else}
-    <Today />
-  {/if}
+  <div class="panel">
+    {#if app.error}
+      <div class="card"><p class="bad">Storage failed: {app.error}</p></div>
+    {:else if !app.ready || app.state === null}
+      <p class="muted">Loading...</p>
+    {:else if app.view === 'practice'}
+      <Practice />
+    {:else if app.view === 'knowledge'}
+      <Knowledge />
+    {:else if app.view === 'progress'}
+      <Progress />
+    {:else}
+      <Today />
+    {/if}
+  </div>
 </main>

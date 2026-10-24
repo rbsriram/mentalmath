@@ -442,7 +442,6 @@
   <div class="corner" class:low={cornerLow}>{corner}</div>
 {/if}
 
-<div class="runner">
 {#if mode === 'session' && session}
   {#if session.completed}
     <div class="card">
@@ -502,4 +501,3 @@
   {/if}
   <p><button class="secondary" onclick={endRun}>End</button></p>
 {/if}
-</div>

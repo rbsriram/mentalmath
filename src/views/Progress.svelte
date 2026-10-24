@@ -98,106 +98,112 @@
 
 <h1>Progress</h1>
 
-<h2>Baseline vs now</h2>
-{#if !st.diagnosticDone && st.diagnostic}
-  <p class="muted">
-    Baseline after the diagnostic ({partsDone(st.diagnostic)} of 4 parts done)
-  </p>
-{/if}
-{#if famRows.length === 0}
-  <p class="muted">Finish the diagnostic to set a baseline.</p>
+{#if !st.baseline && st.sessions.length === 0}
+  <p class="muted">Progress appears after the diagnostic and your first sessions.</p>
 {:else}
-  {#each famRows as f}
-    <div class="card" style="padding:0.6rem 1rem">
-      <p style="margin:0.2rem 0"><strong>{FAMILY_NAME[f] ?? `Family ${f}`}</strong></p>
-      {#if st.baseline}
-        <Bar label="Baseline" value={baselineFam.get(f) ?? 0} baseline />
-      {:else}
-        <div class="bar-row"><span class="bar-label">Baseline</span><span class="muted">in progress</span></div>
-      {/if}
-      <Bar label="Now" value={nowFam.get(f) ?? 0} />
+  {#if famRows.length > 0 || st.diagnostic}
+    <h2>Baseline vs now</h2>
+    {#if !st.diagnosticDone && st.diagnostic}
+      <p class="muted">
+        Baseline after the diagnostic ({partsDone(st.diagnostic)} of 4 parts done)
+      </p>
+    {/if}
+    {#each famRows as f}
+      <div class="card" style="padding:0.6rem 1rem">
+        <p style="margin:0.2rem 0"><strong>{FAMILY_NAME[f] ?? `Family ${f}`}</strong></p>
+        {#if st.baseline}
+          <Bar label="Baseline" value={baselineFam.get(f) ?? 0} baseline />
+        {:else}
+          <div class="bar-row"><span class="bar-label">Baseline</span><span class="muted">in progress</span></div>
+        {/if}
+        <Bar label="Now" value={nowFam.get(f) ?? 0} />
+      </div>
+    {/each}
+  {/if}
+
+  {#if st.baseline || latest || recentSpeed.median !== null}
+    <h2>Speed</h2>
+    <div class="card">
+      <p>
+        {#if st.baseline}
+          Median: {secs(st.baseline.medianMs)} &nbsp; p90: {secs(st.baseline.p90Ms)}
+        {/if}
+        {#if latest}
+          {st.baseline ? '→ now ' : ''}Median: {secs(latest.medianMs)} &nbsp; p90: {secs(latest.p90Ms)}
+        {:else if recentSpeed.median !== null}
+          {st.baseline ? '→ last 7 days ' : ''}Median: {secs(recentSpeed.median)} &nbsp; p90: {secs(recentSpeed.p90)}
+        {/if}
+      </p>
     </div>
-  {/each}
-{/if}
+  {/if}
 
-<h2>Speed</h2>
-<div class="card">
-  <p>
-    Median:
-    {st.baseline ? secs(st.baseline.medianMs) : 'not yet'}
-    &rarr;
-    {latest ? secs(latest.medianMs) : secs(recentSpeed.median)}
-    &nbsp; p90:
-    {st.baseline ? secs(st.baseline.p90Ms) : 'not yet'}
-    &rarr;
-    {latest ? secs(latest.p90Ms) : secs(recentSpeed.p90)}
-  </p>
-</div>
+  {#if weak.length > 0}
+    <h2>Weak areas</h2>
+    {#each weak as w}
+      <div class="skill-row" style="cursor:default">
+        <span class="name">{w.name}</span>
+        <span class="muted">{Math.round(w.acc * 100)}%</span>
+      </div>
+    {/each}
+  {/if}
 
-<h2>Weak areas</h2>
-{#if weak.length === 0}
-  <p class="muted">Practice first; weak spots appear here.</p>
-{:else}
-  {#each weak as w}
-    <div class="skill-row" style="cursor:default">
-      <span class="name">{w.name}</span>
-      <span class="muted">{Math.round(w.acc * 100)}%</span>
+  {#if ret7 !== null || ret30 !== null}
+    <h2>Retention</h2>
+    <div class="card">
+      <p>
+        {#if ret7 !== null}After 7 days: {pct(ret7)}{/if}
+        {#if ret7 !== null && ret30 !== null}&nbsp;{/if}
+        {#if ret30 !== null}After 30 days: {pct(ret30)}{/if}
+      </p>
     </div>
-  {/each}
-{/if}
+  {/if}
 
-<h2>Retention</h2>
-<div class="card">
-  <p>After 7 days: {pct(ret7)} &nbsp; After 30 days: {pct(ret30)}</p>
-</div>
+  {#if st.benchmarks.length > 0 || benchmarkDue(st, now)}
+    <h2>Benchmarks</h2>
+    {#if benchmarkDue(st, now)}
+      <p>
+        <strong>Monthly benchmark is due.</strong>
+        <button class="secondary" onclick={() => startPractice('benchmark')}>Start benchmark</button>
+      </p>
+    {/if}
+    {#if st.benchmarks.length > 0}
+      <table>
+        <thead>
+          <tr><th>Month</th><th>Date</th><th>Accuracy</th><th>Median</th><th>p90</th><th>Transfer</th><th>Classes</th></tr>
+        </thead>
+        <tbody>
+          {#each st.benchmarks as b}
+            <tr>
+              <td>{b.month}</td>
+              <td>{new Date(b.takenAt).toLocaleDateString()}</td>
+              <td>{Math.round(b.accuracy * 100)}%</td>
+              <td>{secs(b.medianMs)}</td>
+              <td>{secs(b.p90Ms)}</td>
+              <td>{pct(b.transferAccuracy)}</td>
+              <td>{b.classesReliable} of 15</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  {/if}
 
-<h2>Benchmarks</h2>
-{#if benchmarkDue(st, now)}
-  <p>
-    <strong>Monthly benchmark is due.</strong>
-    <button class="secondary" onclick={() => startPractice('benchmark')}>Start benchmark</button>
-  </p>
-{/if}
-{#if st.benchmarks.length === 0}
-  <p class="muted">No monthly benchmark yet.</p>
-{:else}
-  <table>
-    <thead>
-      <tr><th>Month</th><th>Date</th><th>Accuracy</th><th>Median</th><th>p90</th><th>Transfer</th><th>Classes</th></tr>
-    </thead>
-    <tbody>
-      {#each st.benchmarks as b}
-        <tr>
-          <td>{b.month}</td>
-          <td>{new Date(b.takenAt).toLocaleDateString()}</td>
-          <td>{Math.round(b.accuracy * 100)}%</td>
-          <td>{secs(b.medianMs)}</td>
-          <td>{secs(b.p90Ms)}</td>
-          <td>{pct(b.transferAccuracy)}</td>
-          <td>{b.classesReliable} of 15</td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
-{/if}
-
-<h2>Recent sessions</h2>
-{#if lastTen.length === 0}
-  <p class="muted">No sessions yet.</p>
-{:else}
-  <table>
-    <thead><tr><th>Date</th><th>Minutes</th><th>Answered</th><th>Accuracy</th></tr></thead>
-    <tbody>
-      {#each lastTen as s}
-        <tr>
-          <td>{s.date}</td>
-          <td>{s.minutes}</td>
-          <td>{s.answered}</td>
-          <td>{s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0}%</td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
+  {#if lastTen.length > 0}
+    <h2>Recent sessions</h2>
+    <table>
+      <thead><tr><th>Date</th><th>Minutes</th><th>Answered</th><th>Accuracy</th></tr></thead>
+      <tbody>
+        {#each lastTen as s}
+          <tr>
+            <td>{s.date}</td>
+            <td>{s.minutes}</td>
+            <td>{s.answered}</td>
+            <td>{s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0}%</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
 {/if}
 
 <h2>Data</h2>

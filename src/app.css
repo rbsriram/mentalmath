@@ -1,7 +1,7 @@
 :root {
   --bg: #f6f7fb;
   --fg: #1d1b2e;
-  --muted: #6b6880;
+  --muted: #565370;
   --card: rgba(255, 255, 255, 0.94);
   --line: rgba(29, 27, 46, 0.08);
   --accent: #3b6fe0;
@@ -251,6 +251,63 @@ input[type='text'].answer {
   }
 }
 
+/* One panel per view carries all text over the illustration. */
+.panel {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 1.25rem;
+  box-shadow: var(--shadow);
+}
+
+@supports (backdrop-filter: blur(1px)) {
+  .panel {
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+}
+
+@media (max-width: 640px) {
+  .panel {
+    padding: 1rem;
+  }
+}
+
+/* Portrait: clear the decorated top band, keep the nav area free. */
+@media (max-aspect-ratio: 1/1) {
+  .panel {
+    margin-top: 8vh;
+  }
+}
+
+/* Cards inside the panel become lighter inner sections. */
+.panel .card {
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(29, 27, 46, 0.08);
+  border-radius: 12px;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-theme='dark'] .panel {
+  background: var(--card);
+}
+:root[data-theme='dark'] .panel .card {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--line);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] .panel {
+    background: var(--card);
+  }
+  :root[data-theme='system'] .panel .card {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: var(--line);
+  }
+}
+
 .muted {
   color: var(--muted);
 }
@@ -354,6 +411,10 @@ main {
 /* Top-left block label wears the same pill so the header row reads as
    one line of chips over the decorated band. */
 .blocklabel {
+  position: fixed;
+  top: calc(0.5rem + env(safe-area-inset-top));
+  left: max(0.75rem, calc(50% - 20rem));
+  z-index: 20;
   display: inline-block;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -362,7 +423,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 999px;
   padding: 0.15rem 0.6rem;
-  margin: 0.5rem 0;
+  margin: 0;
   backdrop-filter: var(--glass, none);
   -webkit-backdrop-filter: var(--glass, none);
 }
@@ -376,12 +437,6 @@ main {
   }
 }
 
-/* Portrait: push the question into the calm middle of the bands. */
-@media (max-aspect-ratio: 1/1) {
-  .runner {
-    padding-top: clamp(96px, 16vh, 180px);
-  }
-}
 
 /* Keys card overlay */
 .keys-card {
