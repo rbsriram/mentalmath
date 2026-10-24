@@ -655,20 +655,8 @@ ol.route li {
 }
 
 
-/* Base-knowledge sheet: status tints on fact cells. */
-.legend {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.legend-cell {
-  font-size: 0.8rem;
-  padding: 0.1rem 0.5rem;
-  border-radius: 999px;
-  border: 1px solid var(--line);
-}
-
+/* Base-knowledge sheet: cells turn amber while a fact is shaky and green
+   once it is known. */
 .sheet-scroll {
   overflow-x: auto;
   max-width: 100%;
@@ -698,10 +686,6 @@ ol.route li {
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: var(--glass, none);
   -webkit-backdrop-filter: var(--glass, none);
-}
-
-.st-new {
-  /* plain surface */
 }
 
 td.st-learning,

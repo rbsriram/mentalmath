@@ -127,12 +127,6 @@
   </div>
 {:else}
   <h2 id="base">Base knowledge</h2>
-  <p class="legend">
-    <span class="legend-cell st-new">not known</span>
-    <span class="legend-cell st-learning">learning</span>
-    <span class="legend-cell st-solid">solid</span>
-    <span class="legend-cell st-strong">strong</span>
-  </p>
 
   <div class="card">
     <h3 style="margin-top:0">Multiplication tables</h3>
