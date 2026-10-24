@@ -11,7 +11,7 @@ Built on 2026-10-24 from `docs/mental-math-devin-brief.md`. The app runs, builds
 
 Not yet done by a human: a real 30-minute session on a phone, and a monthly benchmark run (the code path is tested in isolation, not in the browser).
 
-Remote: https://github.com/rbsriram/mentalmath (public, Apache-2.0). Live at https://rbsriram.com/mentalmath: the user's Vercel site proxies `/mentalmath` to GitHub Pages (`https://rbsriram.github.io/mentalmath/` also works). Vercel redirects `/mentalmath/` to `/mentalmath` (no trailing slash); the app loads there, but the service worker scope is `/mentalmath/`, so offline start at that URL needs the host to keep the slash (Next.js `skipTrailingSlashRedirect`) or a `Service-Worker-Allowed` header.
+Remote: https://github.com/rbsriram/mentalmath (public, Apache-2.0). Live at https://rbsriram.com/mentalmath, hosted by the user on Vercel (server header `Vercel`); the GitHub Pages workflow now deploys only a redirect page (`redirect/index.html`) to that URL. Vercel redirects `/mentalmath/` to `/mentalmath` (no trailing slash); the app loads there, but the service worker scope is `/mentalmath/`, so offline start at that URL needs the host to keep the slash (Next.js `skipTrailingSlashRedirect`) or a `Service-Worker-Allowed` header.
 
 ## How it is built (one breath)
 
