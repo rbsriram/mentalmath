@@ -563,7 +563,7 @@
         </p>
       {/each}
       <button onclick={continuePhase}>Continue</button>
-      <button class="secondary" onclick={stopRun}>Stop</button>
+      <button class="stop" onclick={stopRun}>Stop</button>
     </div>
   {:else if showLesson && learnMethod}
     <MethodCard method={learnMethod} />
@@ -575,7 +575,7 @@
   {/if}
   {#if !session.completed && interstitial === null}
     <p>
-      <button class="secondary" onclick={stopRun}>Stop</button>
+      <button class="stop" onclick={stopRun}>Stop</button>
     </p>
   {/if}
 {:else if mode === 'diagnostic' && diag}
@@ -585,7 +585,7 @@
     <div class="card"><p class="muted">Finishing...</p></div>
   {/if}
   <p>
-    <button class="secondary" onclick={stopRun}>Stop</button>
+    <button class="stop" onclick={stopRun}>Stop</button>
   </p>
 {:else if mode === 'benchmark' && bench}
   {#if question}
@@ -594,11 +594,11 @@
     <div class="card"><p class="muted">Finishing...</p></div>
   {/if}
   <p>
-    <button class="secondary" onclick={stopRun}>Stop</button>
+    <button class="stop" onclick={stopRun}>Stop</button>
   </p>
 {:else}
   {#if question}
     <Question {question} {onSubmit} {onNext} />
   {/if}
-  <p><button class="secondary" onclick={stopRun}>Stop</button></p>
+  <p><button class="stop" onclick={stopRun}>Stop</button></p>
 {/if}

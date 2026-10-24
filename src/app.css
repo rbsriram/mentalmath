@@ -136,6 +136,17 @@ button {
   cursor: pointer;
 }
 
+/* Stop ends a run and keeps progress; it stands out from the neutral buttons. */
+button.stop {
+  background: #e16c85;
+  color: #fff;
+  border-color: #e16c85;
+}
+
+button.stop:hover {
+  filter: brightness(0.95);
+}
+
 button.secondary {
   background: rgba(255, 255, 255, 0.9);
   color: var(--fg);
