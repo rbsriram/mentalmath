@@ -50,4 +50,16 @@ Each entry is numbered so STATE.md and code comments can reference it (e.g. "see
 
 **Why:** The light illustrated look is the intended default. Versioning the theme default instead of re-reading user settings keeps a stored `dark` or `system` choice intact and only moves the v1 `system` default.
 
+## #8 — Start and Stop are the only run controls (2026-10-24)
+
+**Decision:** No pause. A run (diagnostic part, session, benchmark, custom drill) has one Stop button, also on Esc. Stop keeps everything answered and returns to the page the run started from. Runs hide the tabs (focus mode). Parts 2 to 4 of the diagnostic run as the first block of the daily session, so Today has one card and one Start.
+
+**Why:** Every answer is saved the moment it is given, so "pause" and "stop" were the same thing with two names and two buttons. A separate "Continue diagnostic" card next to the session plan made the user ask what to do first.
+
+## #9 — Base facts are memorized, not derived (2026-10-24)
+
+**Decision:** Knowledge opens with a study sheet of the base facts (full 15 × 15 table, complements, squares to 30, fraction equivalents, percent anchors), each block with a Drill button. Cells tint amber while a fact is shaky and green once known. Methods are taught; facts are studied and tested.
+
+**Why:** The user's point: base knowledge is rote. Show the sheet, let the learner study it, then test it, instead of inferring from a placement item whether a fact is known.
+
 <!-- copy the block above for each new decision; never edit or delete past entries -->
