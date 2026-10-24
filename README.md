@@ -49,7 +49,7 @@ The repo carries `.github/workflows/pages.yml`. It only matters once a GitHub re
 - `src/lib/math/` exact rational arithmetic, formatting, seeded RNG.
 - `src/lib/engine/` question types, answer checking, the template registry.
 - `src/lib/engine/templates/` 45 problem generators across ten families.
-- `src/lib/content/` skill graph, fact families, method cards.
+- `src/lib/content/` skill graph, fact families, method cards, the study sheet (study.ts).
 - `src/lib/learn/` records, scheduler, session, diagnostic, benchmark, progress.
 - `src/lib/store/` storage boundary, IndexedDB, export and import.
 - `src/components/` question runner, route display, method cards, bars, fact grids.

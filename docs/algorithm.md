@@ -23,6 +23,10 @@ Each skill and each fact carries a `Rec`:
 
 Facts are per item: table entries, squares, complements, fraction equivalents, percent anchors. Facts share the same record type and rules.
 
+## Base facts
+
+Base facts are memorized, not derived. The Knowledge view opens with the whole base sheet: the 15 x 15 table, complements for 10, 100, and 1000, squares to 30, the 25 fraction equivalents, and the six percent anchors. Cells are tinted by each fact's status so gaps are visible at a glance. Each block has a Drill button that starts custom practice on that family, and the Recall block still introduces each family once with its fallback-method card.
+
 ## Update rules
 
 - Correct: stability becomes `stability === 0 ? 1 : min(stability * 2.2, 120)` days, and `due = now + stability` days. The streak grows.

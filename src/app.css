@@ -654,3 +654,75 @@ ol.route li {
   }
 }
 
+
+/* Base-knowledge sheet: status tints on fact cells. */
+.legend {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.legend-cell {
+  font-size: 0.8rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+}
+
+.sheet-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+
+.sheet {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet th,
+.sheet td {
+  padding: 0.15rem 0.35rem;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sheet td {
+  border-radius: 2px;
+}
+
+.sheet .rowhead {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: var(--glass, none);
+  -webkit-backdrop-filter: var(--glass, none);
+}
+
+.st-new {
+  /* plain surface */
+}
+
+td.st-learning,
+tr.st-learning > td,
+.comp.st-learning {
+  background: rgba(180, 140, 30, 0.18);
+}
+
+td.st-solid,
+tr.st-solid > td,
+.comp.st-solid {
+  background: rgba(31, 138, 91, 0.18);
+}
+
+td.st-strong,
+tr.st-strong > td,
+.comp.st-strong {
+  background: rgba(31, 138, 91, 0.34);
+}
+
+/* Anchored headings land below the sticky nav. */
+h2[id] {
+  scroll-margin-top: calc(var(--nav-h, 45px) + 1rem);
+}

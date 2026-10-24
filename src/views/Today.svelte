@@ -89,6 +89,9 @@
     <button bind:this={btnDiag} onclick={() => startPractice('diagnostic')}>
       {diagPending ? 'Continue diagnostic' : 'Start diagnostic'}
     </button>
+    <button class="secondary" onclick={() => go('knowledge', 'base')}>
+      Study base facts
+    </button>
   </div>
 {:else}
   {#if benchmarkDue(st, now)}

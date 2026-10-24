@@ -33,6 +33,7 @@ function stripDecorations(s: string): string {
   t = t.replace(/^[A-Za-z]{3}\s+/, ''); // leading currency code
   t = t.replace(/\s+[A-Za-z]{3}$/, ''); // trailing currency code
   t = t.replace(/\s*%$/, ''); // percent sign
+  t = t.replace(/\.{3}$|…$/, ''); // trailing ellipsis from route/sheet text
   return t.trim();
 }
 

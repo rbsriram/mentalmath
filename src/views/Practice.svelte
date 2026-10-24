@@ -486,6 +486,8 @@
       mode = 'idle';
       app.running = false;
       shown = null;
+    } else if (app.runOrigin === 'knowledge') {
+      go('knowledge');
     } else {
       go('today');
     }

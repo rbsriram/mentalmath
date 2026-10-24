@@ -588,7 +588,7 @@ export const METHODS: Method[] = [
     name: 'Tables from anchors',
     skill: 'tables-1-10',
     rule: 'Build each product from 10s and 5s: a × b = a × 10 − a × (10 − b), or work up from a × 5.',
-    rationale: 'Ten times is a shift and five times is half of it, so 7 × 8 = 7 × 10 − 7 × 2 = 70 − 14 = 56.',
+    rationale: 'The tables are memorized; anchors are only the fallback while a fact has not stuck. Ten times is a shift and five times is half of it, so 7 × 8 = 7 × 10 − 7 × 2 = 70 − 14 = 56.',
     prereqs: ['mul-distributive'],
     patterns: [
       'Up to 10: 7 × 8 = 7 × 10 − 7 × 2.',
@@ -604,7 +604,7 @@ export const METHODS: Method[] = [
     name: 'Complement rule',
     skill: 'complements-10',
     rule: 'All digits go to 9 except the last nonzero one, which goes to 10.',
-    rationale: 'Nines carry no borrows; the final ten supplies every borrow at once.',
+    rationale: 'Complements are memorized; this rule is the fallback until each pair is automatic. Nines carry no borrows; the final ten supplies every borrow at once.',
     prereqs: ['place-value'],
     patterns: [
       'To 100: the complement of 68 is 32 (6 → 9, 8 → 10).',
@@ -620,7 +620,7 @@ export const METHODS: Method[] = [
     name: 'Squares from anchors',
     skill: 'squares-1-25',
     rule: 'Squares ending in 5 come free ((n5)² = n(n+1) followed by 25); for the rest use (n+k)(n−k) + k² around a known square.',
-    rationale: 'n² = (n+k)(n−k) + k², so a hard square reduces to one easy product.',
+    rationale: 'Squares are memorized; the anchor trick is the fallback until they are. n² = (n+k)(n−k) + k², so a hard square reduces to one easy product.',
     prereqs: ['squares-1-25', 'mul-distributive'],
     patterns: [
       '35² = 3 × 4 followed by 25 = 1225.',

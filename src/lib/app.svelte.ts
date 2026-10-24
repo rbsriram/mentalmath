@@ -30,7 +30,7 @@ export const app = $state({
   // Focus mode: a run owns the screen (nav hidden) until it ends or
   // Stop takes the user back to runOrigin.
   running: false,
-  runOrigin: 'today' as 'today' | 'practice',
+  runOrigin: 'today' as 'today' | 'practice' | 'knowledge',
   customSkills: [] as string[],
   customBand: null as number | null,
 });
@@ -149,7 +149,7 @@ export function startPractice(
   customSkills: string[] = [],
   customBand: number | null = null,
   sessionShort = false,
-  runOrigin: 'today' | 'practice' = 'today',
+  runOrigin: 'today' | 'practice' | 'knowledge' = 'today',
 ): void {
   app.practiceMode = mode;
   app.practiceExplicit = true;
