@@ -83,6 +83,9 @@ export function valueAppearsInText(value: Rational, text: string): boolean {
     candidates.add(`${value.n}/${value.d}`);
     candidates.add(`${formatInt(value.n)}/${formatInt(value.d)}`);
   }
+  // Repeating values appear in route text as a 3-place rounding with an
+  // ellipsis, e.g. 0.167…; the rounded form itself is the substring.
+  candidates.add(toDecimal(value, 3));
   if (isTerminating(value)) {
     const dec = toDisplay(value);
     candidates.add(dec);

@@ -2,16 +2,20 @@
   import { checkAnswer, type CheckResult } from '../lib/engine/answer';
   import type { Question as Q } from '../lib/engine/types';
   import { displayAnswer } from '../lib/math/format';
+  import { go } from '../lib/app.svelte';
   import Route from './Route.svelte';
 
   let {
     question,
     skippable = false,
+    methodLink = null,
     onSubmit,
     onNext,
   }: {
     question: Q;
     skippable?: boolean;
+    // A fact question can link to its family's method card after a miss.
+    methodLink?: { name: string; skill: string } | null;
     // Records the attempt and returns the check result.
     onSubmit: (raw: string, ms: number) => CheckResult;
     onNext: () => void;
@@ -162,6 +166,13 @@
         {/if}
       {/if}
       <Route {question} />
+      {#if methodLink}
+        <p style="margin:0.5rem 0 0">
+          <button class="secondary" onclick={() => go('knowledge', methodLink.skill)}>
+            Method: {methodLink.name}
+          </button>
+        </p>
+      {/if}
     {/if}
     <p class="muted" style="font-size:0.85rem">Enter to continue</p>
   </div>

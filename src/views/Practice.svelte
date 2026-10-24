@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
   import { app, commit, commitQuiet, go, harnessHook, loadAttempts, logAttempt, startPractice } from '../lib/app.svelte';
-  import { METHODS } from '../lib/content/methods';
+  import { FAMILY_METHOD, METHODS } from '../lib/content/methods';
+  import { factFamilyOf, familySkillForFact } from '../lib/content/facts';
   import { SKILLS } from '../lib/content/skills';
   import type { CheckResult } from '../lib/engine/answer';
   import {
@@ -38,7 +39,7 @@
     type Session,
   } from '../lib/learn/session';
   import { localDay } from '../lib/learn/model';
-  import { recordOutcome } from '../lib/learn/state';
+  import { markFamilyIntroduced, recordOutcome } from '../lib/learn/state';
   import { displayAnswer } from '../lib/math/format';
   import { createRng } from '../lib/math/rng';
   import type { Question as Q } from '../lib/engine/types';
@@ -49,6 +50,7 @@
 
   const skillName = new Map(SKILLS.map((s) => [s.id, s.name]));
   const methodFor = new Map(METHODS.map((m) => [m.skill, m]));
+  const methodById = new Map(METHODS.map((m) => [m.id, m]));
   const FAMILY_NAME: Record<number, string> = {
     1: 'Foundations',
     2: 'Addition and subtraction',
@@ -189,6 +191,21 @@
   const learnMethod = $derived(
     session?.target ? (methodFor.get(session.target) ?? null) : null,
   );
+  const familyMethod = $derived(
+    session?.pendingLesson?.method
+      ? (methodById.get(session.pendingLesson.method) ?? null)
+      : null,
+  );
+  // Wrong-answer feedback on a fact offers the family's method card.
+  const factMethodLink = $derived.by(() => {
+    const q = question;
+    if (q === null || q.factId === undefined) return null;
+    const family = factFamilyOf(q.factId);
+    const mid = family === null ? undefined : FAMILY_METHOD[family];
+    const m = mid === undefined ? undefined : methodById.get(mid);
+    const skill = familySkillForFact(q.factId);
+    return m && skill ? { name: m.name, skill } : null;
+  });
   const showLesson = $derived(
     mode === 'session' &&
       session !== null &&
@@ -338,6 +355,18 @@
     session = out.session;
     commit(out.state);
     serveNext();
+  }
+
+  // A fact-family card shows once before the family's first fact; the
+  // fact is already served, so Continue just marks the family taught.
+  function familyLessonContinue() {
+    if (!session?.pendingLesson) return;
+    const factId = session.current?.factId;
+    const family = factId !== undefined ? factFamilyOf(factId) : null;
+    let s = app.state!;
+    if (family !== null) s = markFamilyIntroduced(s, family);
+    session = { ...session, pendingLesson: null };
+    commit({ ...s, session });
   }
 
   function onSubmit(raw: string, ms: number): CheckResult {
@@ -491,6 +520,9 @@
     } else if (showLesson && e.key === 'Enter') {
       e.preventDefault();
       lessonContinue();
+    } else if (session?.pendingLesson && e.key === 'Enter') {
+      e.preventDefault();
+      familyLessonContinue();
     }
   }
 
@@ -583,6 +615,9 @@
       <button onclick={continuePhase}>Continue</button>
       <button class="stop" onclick={stopRun}>Stop</button>
     </div>
+  {:else if session.pendingLesson && familyMethod}
+    <MethodCard method={familyMethod} />
+    <button onclick={familyLessonContinue}>Continue</button>
   {:else if showLesson && learnMethod}
     <MethodCard method={learnMethod} />
     <button onclick={lessonContinue}>Continue</button>
@@ -592,6 +627,7 @@
       {onSubmit}
       {onNext}
       skippable={phase?.kind === 'diagnostic'}
+      methodLink={factMethodLink}
     />
   {:else}
     <div class="card"><p class="muted">Preparing...</p></div>
@@ -621,7 +657,7 @@
   </p>
 {:else}
   {#if question}
-    <Question {question} {onSubmit} {onNext} />
+    <Question {question} {onSubmit} {onNext} methodLink={factMethodLink} />
   {/if}
   <p><button class="stop" onclick={stopRun}>Stop</button></p>
 {/if}

@@ -8,7 +8,7 @@ const T0 = new Date(2025, 0, 10, 9, 0, 0).getTime();
 describe('newState and migrate', () => {
   it('builds a versioned empty document', () => {
     const s = newState(T0);
-    expect(s.version).toBe(2);
+    expect(s.version).toBe(3);
     expect(s.createdAt).toBe(T0);
     expect(s.skills).toEqual({});
     expect(s.facts).toEqual({});
@@ -21,7 +21,7 @@ describe('newState and migrate', () => {
   it('migrate accepts a valid v1 document', () => {
     const s = newState(T0);
     const round = migrate(JSON.parse(JSON.stringify(s)));
-    expect(round.version).toBe(2);
+    expect(round.version).toBe(3);
     expect(round.createdAt).toBe(T0);
   });
 
@@ -88,7 +88,7 @@ describe('version 2 migration', () => {
   it('a v1 document with system theme migrates to v2 light', () => {
     const v1 = { ...newState(T0), version: 1, settings: { theme: 'system' } };
     const doc = migrate(v1);
-    expect(doc.version).toBe(2);
+    expect(doc.version).toBe(3);
     expect(doc.settings.theme).toBe('light');
   });
 
@@ -101,7 +101,24 @@ describe('version 2 migration', () => {
   it('a v2 document passes through untouched', () => {
     const s = newState(T0);
     const doc = migrate(s);
-    expect(doc.version).toBe(2);
+    expect(doc.version).toBe(3);
     expect(doc.settings.theme).toBe('light');
+  });
+});
+
+describe('version 3 migration', () => {
+  it('a v2 document gains an empty familyIntroduced map', () => {
+    const v2 = { ...newState(T0), version: 2 };
+    delete (v2 as Record<string, unknown>).familyIntroduced;
+    const doc = migrate(v2);
+    expect(doc.version).toBe(3);
+    expect(doc.familyIntroduced).toEqual({});
+  });
+
+  it('a v3 document passes through untouched', () => {
+    const v3 = newState(T0);
+    v3.familyIntroduced = { tables: true };
+    const doc = migrate(JSON.parse(JSON.stringify(v3)));
+    expect(doc.familyIntroduced).toEqual({ tables: true });
   });
 });

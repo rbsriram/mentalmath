@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SKILLS } from '../src/lib/content/skills';
-import { METHODS } from '../src/lib/content/methods';
+import { FAMILY_METHOD, METHODS } from '../src/lib/content/methods';
 import {
   complementFactId,
   FACT_FAMILIES,
@@ -248,6 +248,17 @@ describe('benchmark coverage', () => {
         const q = generate(id, 42, 2);
         expect(q.prompt.length).toBeGreaterThan(0);
       }
+    }
+  });
+});
+
+describe('fact family lessons', () => {
+  it('every fact family maps to an existing method', () => {
+    const ids = new Set(METHODS.map((m) => m.id));
+    for (const family of FACT_FAMILIES) {
+      const mid = FAMILY_METHOD[family];
+      expect(mid, `${family} has no method mapping`).toBeDefined();
+      expect(ids.has(mid!), `${family} -> ${mid} is not a method`).toBe(true);
     }
   });
 });

@@ -27,7 +27,7 @@ export interface SessionSummary {
 }
 
 export interface State {
-  version: 2;
+  version: 3;
   createdAt: number;
   skills: Record<string, Rec>;
   facts: Record<string, Rec>;
@@ -39,12 +39,15 @@ export interface State {
   diagnosticDone: boolean;
   baseline: BenchmarkReport | null;
   benchmarks: BenchmarkReport[];
+  // Fact families already taught by a Recall lesson card; each family
+  // gets one card, ever.
+  familyIntroduced: Record<string, boolean>;
   settings: { theme: 'system' | 'light' | 'dark' };
 }
 
 export function newState(now: number): State {
   return {
-    version: 2,
+    version: 3,
     createdAt: now,
     skills: {},
     facts: {},
@@ -56,6 +59,7 @@ export function newState(now: number): State {
     diagnosticDone: false,
     baseline: null,
     benchmarks: [],
+    familyIntroduced: {},
     settings: { theme: 'light' },
   };
 }
@@ -70,9 +74,14 @@ export const MIGRATIONS: Record<number, (s: unknown) => unknown> = {
     if (settings.theme === 'system') settings.theme = 'light';
     return { ...d, settings, version: 2 };
   },
+  2: (doc) => {
+    // v2 -> v3: the per-family lesson flags start empty.
+    const d = doc as Record<string, unknown>;
+    return { ...d, familyIntroduced: {}, version: 3 };
+  },
 };
 
-const LATEST_VERSION = 2;
+const LATEST_VERSION = 3;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -195,4 +204,13 @@ export function recordOutcome(
     sessionId: opts.sessionId,
   };
   return { state: { ...state, skills, facts }, attempt, result };
+}
+
+// One lesson card per fact family, ever: the Recall runner marks the
+// family as introduced before the first fact is shown.
+export function markFamilyIntroduced(state: State, family: string): State {
+  return {
+    ...state,
+    familyIntroduced: { ...state.familyIntroduced, [family]: true },
+  };
 }

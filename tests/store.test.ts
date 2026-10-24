@@ -61,7 +61,7 @@ describe('export/import', () => {
     const attempts = [att(1), att(2)];
     const doc = exportData(state, attempts);
     expect(doc.format).toBe('mentalmath-export');
-    expect(doc.version).toBe(2);
+    expect(doc.version).toBe(3);
     const back = importData(JSON.parse(JSON.stringify(doc)));
     expect(back.state.createdAt).toBe(T0);
     expect(back.attempts.length).toBe(2);

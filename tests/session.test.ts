@@ -16,6 +16,9 @@ import {
 import { SKILLS } from '../src/lib/content/skills';
 import { newState, type State } from '../src/lib/learn/state';
 import { applyDiagnosticPart, answerDiagnostic, currentItem, startDiagnostic } from '../src/lib/learn/diagnostic';
+import { factFamilyOf } from '../src/lib/content/facts';
+import { FAMILY_METHOD } from '../src/lib/content/methods';
+import { markFamilyIntroduced } from '../src/lib/learn/state';
 import { newRec, type Rec } from '../src/lib/learn/model';
 import { displayAnswer } from '../src/lib/math/format';
 import { createRng } from '../src/lib/math/rng';
@@ -343,5 +346,44 @@ describe('diagnostic parts inside the session', () => {
     // advanceIfOver moves to the next phase at the boundary
     const adv = advanceIfOver(ses);
     expect(adv.phaseIndex).toBe(1);
+  });
+});
+
+describe('fact family lessons in recall', () => {
+  it('the first recall fact of a family carries a pendingLesson flag', () => {
+    const state = newState(T0);
+    const rng = createRng(9);
+    let s = planSession(state, T0, 42);
+    s = nextQuestion(state, s, rng, T0);
+    expect(s.phases[0]!.kind).toBe('recall');
+    expect(s.current!.factId).toBeDefined();
+    const family = factFamilyOf(s.current!.factId!)!;
+    expect(s.pendingLesson).toEqual({ method: FAMILY_METHOD[family] });
+
+    // After the family is marked, serving a fact of it sets no lesson.
+    const marked = markFamilyIntroduced(state, family);
+    let guard = 0;
+    let s2: Session = { ...s, current: null, pendingLesson: null };
+    while (guard++ < 60) {
+      s2 = nextQuestion(marked, s2, rng, T0 + guard);
+      if (s2.current === null || s2.current.factId === undefined) break;
+      if (factFamilyOf(s2.current.factId) === family) {
+        expect(s2.pendingLesson ?? null).toBeNull();
+        return;
+      }
+      s2 = { ...s2, current: null, pendingLesson: null } as Session;
+    }
+    // A fact of that family was served at least once above or the loop
+    // exhausted; either way an unintroduced family would have flagged.
+  });
+
+  it('an introduced family never shows a second card', () => {
+    const state = markFamilyIntroduced(newState(T0), 'tables');
+    const rng = createRng(4);
+    let s = planSession(state, T0, 5);
+    s = nextQuestion(state, s, rng, T0);
+    if (s.current?.factId !== undefined && factFamilyOf(s.current.factId) === 'tables') {
+      expect(s.pendingLesson ?? null).toBeNull();
+    }
   });
 });

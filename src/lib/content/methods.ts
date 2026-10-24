@@ -19,6 +19,19 @@ export interface Method {
   next: string[];
 }
 
+// Fact family -> the method card shown once before the family's first
+// recall drill. Authoring note: every key must exist in facts.ts
+// FACT_FAMILIES and every value must be a method id in this file.
+export const FAMILY_METHOD: Record<string, string> = {
+  tables: 'tables-anchors',
+  squares: 'squares-anchors',
+  'complements-10': 'complements-rule',
+  'complements-100': 'complements-rule',
+  'complements-1000': 'complements-rule',
+  'fraction-equivalents': 'frac-to-dec-pct',
+  'percent-anchors': 'pct-anchors',
+};
+
 export const METHODS: Method[] = [
   {
     id: 'add-left-to-right',
@@ -284,13 +297,17 @@ export const METHODS: Method[] = [
     id: 'frac-to-dec-pct',
     name: 'Fraction to decimal or percent',
     skill: 'frac-to-dec-pct',
-    rule: 'Divide the numerator by the denominator, or scale n/d to n × 100 ÷ d percent.',
-    rationale: 'A fraction is a division. Percent is the same division times 100.',
+    rule: 'Scale the denominator to 10, 100, or 1000; if you cannot, halve a known equivalent or use the repeating anchors 1/3, 1/6, 1/9.',
+    rationale: 'A denominator built from 2s and 5s always reaches a power of ten, which is the fastest way there. Sixteenths halve a known eighth; thirds, sixths, and ninths are worth memorizing because they repeat.',
     prereqs: ['fraction-equivalents', 'div-decimal-shift'],
-    patterns: ['Any fraction, like 7/16 = 0.4375 = 43.75%.'],
-    limits: ['Repeating decimals like 1/3 stay repeating; give three digits or the fraction.'],
+    patterns: [
+      'Scale to a power of ten: 1/20 = 5/100 = 0.05 and 7/8 = 875/1000 = 0.875.',
+      'Halve an anchor: 3/16 = half of 0.375 = 0.1875.',
+      'Repeating anchors: 2/9 = 2 × 0.111… = 0.222….',
+    ],
+    limits: ['Denominators like 7 or 13 still need division or an estimate.'],
     exampleTemplate: 'frac-to-dec-pct',
-    exampleBand: 2,
+    exampleBand: 1,
     next: ['pct-build'],
   },
   {
@@ -565,5 +582,53 @@ export const METHODS: Method[] = [
     exampleTemplate: 'signed',
     exampleBand: 1,
     next: [],
+  },
+  {
+    id: 'tables-anchors',
+    name: 'Tables from anchors',
+    skill: 'tables-1-10',
+    rule: 'Build each product from 10s and 5s: a × b = a × 10 − a × (10 − b), or work up from a × 5.',
+    rationale: 'Ten times is a shift and five times is half of it, so 7 × 8 = 7 × 10 − 7 × 2 = 70 − 14 = 56.',
+    prereqs: ['mul-distributive'],
+    patterns: [
+      'Up to 10: 7 × 8 = 7 × 10 − 7 × 2.',
+      'Teens: 7 × 13 = 7 × 10 + 7 × 3.',
+    ],
+    limits: ['Anchors are the route in while recall lags; the table itself should end up automatic.'],
+    exampleTemplate: 'mul-multi-term',
+    exampleBand: 1,
+    next: ['mul-distributive-split'],
+  },
+  {
+    id: 'complements-rule',
+    name: 'Complement rule',
+    skill: 'complements-10',
+    rule: 'All digits go to 9 except the last nonzero one, which goes to 10.',
+    rationale: 'Nines carry no borrows; the final ten supplies every borrow at once.',
+    prereqs: ['place-value'],
+    patterns: [
+      'To 100: the complement of 68 is 32 (6 → 9, 8 → 10).',
+      'To 1000: the complement of 437 is 563.',
+    ],
+    limits: ['Trailing zeros: the last nonzero digit is the one that goes to 10.'],
+    exampleTemplate: 'complement',
+    exampleBand: 1,
+    next: ['add-compensation'],
+  },
+  {
+    id: 'squares-anchors',
+    name: 'Squares from anchors',
+    skill: 'squares-1-25',
+    rule: 'Squares ending in 5 come free ((n5)² = n(n+1) followed by 25); for the rest use (n+k)(n−k) + k² around a known square.',
+    rationale: 'n² = (n+k)(n−k) + k², so a hard square reduces to one easy product.',
+    prereqs: ['squares-1-25', 'mul-distributive'],
+    patterns: [
+      '35² = 3 × 4 followed by 25 = 1225.',
+      '47² = 50 × 44 + 3² = 2200 + 9 = 2209.',
+    ],
+    limits: ['Below 25² the squares themselves should be recall, not computed.'],
+    exampleTemplate: 'mul-near-base',
+    exampleBand: 2,
+    next: ['mul-near-base'],
   },
 ];

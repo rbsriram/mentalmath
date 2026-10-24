@@ -33,12 +33,84 @@ function gcdN(a: number, b: number): number {
   return b === 0 ? a : gcdN(b, a % b);
 }
 
-// Long-division route for n/d rendered as decimal or percent steps.
+// Mental routes for n/d rendered as decimal or percent steps, in the
+// order a mental calculator tries them: scale the denominator to a power
+// of ten, halve a known anchor, reach for a repeating anchor, then fall
+// back to long division.
 function conversionRoute(n: number, d: number, ask: 'decimal' | 'percent'): Step[] {
   const value = ask === 'percent' ? rat(100 * n, d) : rat(n, d);
   const scaled = ask === 'percent' ? BigInt(100 * n) : BigInt(n);
   const dd = BigInt(d);
   const steps: Step[] = [];
+
+  // (a) The denominator divides a power of ten: scale n/d instead of
+  // dividing at all.
+  for (const p of [10, 100, 1000]) {
+    if (p % d !== 0) continue;
+    const k = p / d;
+    const up = n * k;
+    steps.push(step(`Scale to ${p}: ${d} × ${k} = ${p}`, R(p)));
+    steps.push(step(`${n} × ${k} = ${up}`, R(up)));
+    steps.push(
+      step(
+        ask === 'percent'
+          ? `${n}/${d} = ${up}/${p} = ${toDisplay(value)}%`
+          : `${n}/${d} = ${up}/${p} = ${toDisplay(value)}`,
+        value,
+      ),
+    );
+    return steps;
+  }
+
+  // (b) Sixteenths and thirty-seconds: halve a known anchor.
+  if (d === 16 || d === 32) {
+    const dens = d === 16 ? [8, 16] : [8, 16, 32];
+    let prev = '';
+    for (const den of dens) {
+      const v = rat(n, den);
+      const dv = toDisplay(v);
+      if (den === 8) {
+        steps.push(step(`${n}/8 = ${dv}`, v));
+      } else {
+        steps.push(step(`${n}/${den} = half of ${prev} = ${dv}`, v));
+      }
+      prev = dv;
+    }
+    if (ask === 'percent') {
+      steps.push(step(`${prev} = ${toDisplay(value)}%`, value));
+    }
+    return steps;
+  }
+
+  // (c) Repeating anchors for thirds, sixths, ninths, twelfths, fifteenths.
+  const repeatingAnchors: Record<number, string> = {
+    3: '1/3 = 0.333…',
+    6: '1/6 = half of 1/3 = 0.167…',
+    9: '1/9 = 0.111…',
+    12: '1/12 = half of 1/6 = 0.083…',
+    15: '1/15 = (1/3) ÷ 5 = 0.067…',
+  };
+  const anchor = repeatingAnchors[d];
+  if (anchor !== undefined) {
+    const anchorDec = `${toDecimal(rat(1, d), 3)}…`;
+    const fracDec = `${toDecimal(rat(n, d), 3)}…`;
+    const dec = `${toDecimal(value, 3)}…`;
+    steps.push(step(anchor, rat(1, d)));
+    steps.push(
+      step(
+        n === 1
+          ? `${n}/${d} = ${fracDec}`
+          : `${n}/${d} = ${n} × ${anchorDec} = ${fracDec}`,
+        rat(n, d),
+      ),
+    );
+    if (ask === 'percent') {
+      steps.push(step(`${fracDec} = ${dec}%`, value));
+    }
+    return steps;
+  }
+
+  // (d) Long division, the fallback.
   const intPart = scaled / dd;
   const firstRem = scaled % dd;
   if (ask === 'percent') {

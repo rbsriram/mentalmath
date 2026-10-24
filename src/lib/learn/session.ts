@@ -18,6 +18,7 @@ import { seedFor, type Rng } from '../math/rng';
 import type { Attempt } from './attempt';
 import { localDay, newRec } from './model';
 import { factFamilyOf } from '../content/facts';
+import { FAMILY_METHOD } from '../content/methods';
 import {
   answerDiagnostic,
   applyDiagnosticPart,
@@ -68,6 +69,9 @@ export interface Session {
   completed: boolean;
   paused: boolean;
   short: boolean; // the 10 minute plan: recall + practice only
+  // A fact-family lesson card to show before the served fact, the same
+  // pattern as lessonShown but set per item by nextQuestion.
+  pendingLesson?: { method: string } | null;
 }
 
 export interface CurrentItem {
@@ -290,6 +294,13 @@ export function nextQuestion(
     reviewQueue,
     recentPrompts,
     lastTemplateId: question.templateId,
+    pendingLesson:
+      phase.kind === 'recall' &&
+      question.factId !== undefined &&
+      FAMILY_METHOD[factFamilyOf(question.factId)!] !== undefined &&
+      !state.familyIntroduced[factFamilyOf(question.factId)!]
+        ? { method: FAMILY_METHOD[factFamilyOf(question.factId)!]! }
+        : null,
   };
 }
 
