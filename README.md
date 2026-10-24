@@ -1,5 +1,7 @@
 # Mental Math
 
+Live at https://rbsriram.com/mentalmath
+
 A local-first web app that trains mental arithmetic. It generates problems, teaches methods, tracks what you know, and plans a 30 minute daily session. All data stays in your browser.
 
 ## Requirements
