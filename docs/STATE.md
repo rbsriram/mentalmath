@@ -11,7 +11,7 @@ Built in one day on 2026-10-24 from `docs/mental-math-devin-brief.md`. The app r
 
 Not yet done by a human: a real 30-minute session on a phone, and a monthly benchmark run (the code path is tested in isolation, not in the browser).
 
-No git remote exists. The state lives on one machine only until a remote is added.
+Remote: https://github.com/rbsriram/mentalmath (public, Apache-2.0). The Pages workflow deploys green, but the account-level custom domain `rbsriram.com` (a stale `CNAME` file in the `rbsriram.github.io` repo, last touched 2024-08) maps every project site to `rbsriram.com/<repo>/`, and that apex now forwards to nullvelocity.com. So `https://rbsriram.com/mentalmath/` returns 404 until that CNAME is removed. Removing it restores `https://rbsriram.github.io/mentalmath/`.
 
 ## How it is built (one breath)
 
@@ -37,7 +37,7 @@ A static PWA. Svelte 5 + TypeScript + Vite 8, runtime dependency `svelte` only (
 
 ## Next / in flight
 
-1. Add a GitHub remote and enable Pages (workflow is in `.github/workflows/pages.yml`, base path `/mentalmath/`).
+1. Unblock the Pages URL: delete `CNAME` from `rbsriram/rbsriram.github.io` (needs the user's go; it changes where `rbsriram.github.io` itself points).
 2. Use it for real for a week. Watch the speed targets in `src/lib/learn/targets.ts` and the bucket weights in `src/lib/learn/scheduler.ts`; both are constants meant to be tuned from experience.
 3. Run one monthly benchmark in the browser when it comes due (30 days after first use) and check the Progress table.
 
