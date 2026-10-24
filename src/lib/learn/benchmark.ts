@@ -145,7 +145,13 @@ export function answerBenchmark(
     items: [...bench.items, item],
     done: slotIndex >= BENCHMARK_SLOTS.length,
   };
-  return { state: out.state, benchmark, attempt: out.attempt, result: out.result, question };
+  return {
+    state: { ...out.state, benchmark },
+    benchmark,
+    attempt: out.attempt,
+    result: out.result,
+    question,
+  };
 }
 
 function median(sorted: number[]): number | null {

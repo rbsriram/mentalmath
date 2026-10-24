@@ -223,6 +223,48 @@ main {
   }
 }
 
+/* Corner timer */
+.corner {
+  position: fixed;
+  top: calc(0.5rem + env(safe-area-inset-top));
+  right: 0.75rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  z-index: 20;
+}
+
+.corner.low {
+  opacity: 0.55;
+}
+
+/* Keys card overlay */
+.keys-card {
+  position: fixed;
+  top: calc(3.5rem + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: 22rem;
+  width: calc(100% - 2rem);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+  z-index: 30;
+  box-shadow: 0 8px 30px rgb(0 0 0 / 0.25);
+}
+
+.keys-card table {
+  font-size: 0.85rem;
+}
+
+.keys-card td:first-child {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--muted);
+  width: 7rem;
+}
+
 /* Status chips and badges */
 .chip {
   display: inline-block;

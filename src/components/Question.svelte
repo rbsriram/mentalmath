@@ -24,7 +24,7 @@
   let showRoute = $state(false);
   let shownAt = $state(0);
 
-  const answered = $derived(result !== null && result.reason !== 'unparsable' && result.reason !== 'empty');
+  const answered = $derived(result !== null);
   const shown = $derived(displayAnswer(question.answer));
 
   $effect(() => {
@@ -79,6 +79,10 @@
       e.preventDefault();
       e.stopPropagation(); // the window handler must not see this Enter
       submit();
+    } else if (e.key === ' ' && given.trim() === '') {
+      e.preventDefault();
+      e.stopPropagation();
+      skip();
     } else if (e.key === 'r' && answered && result?.correct) {
       showRoute = !showRoute;
     }
@@ -86,11 +90,20 @@
 
   function onGlobal(e: KeyboardEvent) {
     // A printable keystroke while nothing is focused goes to the field.
-    if (!answered && e.key.length === 1 && document.activeElement !== input) {
+    // '?' is reserved for the keys card in App.
+    if (
+      !answered &&
+      e.key.length === 1 &&
+      e.key !== '?' &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      document.activeElement !== input
+    ) {
       input?.focus();
     }
-    // r toggles the route while feedback is shown; Enter continues.
-    if (e.key === 'Enter' && answered) {
+    // r toggles the route while feedback is shown; Enter or Space continue.
+    if ((e.key === 'Enter' || e.key === ' ') && answered) {
       e.preventDefault();
       onNext();
     } else if (e.key === 'r' && answered) {
@@ -123,11 +136,7 @@
   {#if hint}
     <p class="muted" style="text-align:center">{hint}</p>
   {/if}
-  {#if skippable}
-    <p style="text-align:center">
-      <button class="secondary" onclick={skip}>Skip</button>
-    </p>
-  {/if}
+
 {:else}
   <div class="card" style="text-align:center">
     {#if result?.correct}

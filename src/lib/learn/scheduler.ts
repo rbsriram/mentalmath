@@ -141,22 +141,15 @@ export function frontier(state: State): string[] {
   return skills.map((s) => s.id);
 }
 
-// Keep the current target while it is still unlocked and not yet solid;
-// otherwise take the front of the frontier.
+// Keep the current target while it is still on the frontier (unlocked, not
+// yet solid, and not implied known by a dependent); otherwise take the
+// front of the frontier.
 export function chooseTarget(state: State): string | null {
-  if (state.target !== null) {
-    const kind = SKILL_MAP.get(state.target)?.kind;
-    const st = status(recOf(state, state.target));
-    if (
-      unlocked(state, state.target) &&
-      st !== 'solid' &&
-      st !== 'strong' &&
-      (kind === 'method' || kind === 'application')
-    ) {
-      return state.target;
-    }
+  const front = frontier(state);
+  if (state.target !== null && front.includes(state.target)) {
+    return state.target;
   }
-  return frontier(state)[0] ?? null;
+  return front[0] ?? null;
 }
 
 export type Bucket =

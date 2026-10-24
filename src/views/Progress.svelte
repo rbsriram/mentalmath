@@ -14,6 +14,7 @@
     recentMedianP90,
     weakAreas,
   } from '../lib/learn/progress';
+  import { partsDone } from '../lib/learn/diagnostic';
   import { newState } from '../lib/learn/state';
   import { exportData, exportFilename, importData } from '../lib/store/export';
   import Bar from '../components/Bar.svelte';
@@ -98,13 +99,22 @@
 <h1>Progress</h1>
 
 <h2>Baseline vs now</h2>
+{#if !st.diagnosticDone && st.diagnostic}
+  <p class="muted">
+    Baseline after the diagnostic ({partsDone(st.diagnostic)} of 4 parts done)
+  </p>
+{/if}
 {#if famRows.length === 0}
   <p class="muted">Finish the diagnostic to set a baseline.</p>
 {:else}
   {#each famRows as f}
     <div class="card" style="padding:0.6rem 1rem">
       <p style="margin:0.2rem 0"><strong>{FAMILY_NAME[f] ?? `Family ${f}`}</strong></p>
-      <Bar label="Baseline" value={baselineFam.get(f) ?? 0} baseline />
+      {#if st.baseline}
+        <Bar label="Baseline" value={baselineFam.get(f) ?? 0} baseline />
+      {:else}
+        <div class="bar-row"><span class="bar-label">Baseline</span><span class="muted">in progress</span></div>
+      {/if}
       <Bar label="Now" value={nowFam.get(f) ?? 0} />
     </div>
   {/each}

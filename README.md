@@ -19,6 +19,15 @@ pnpm build         # production build into dist/
 pnpm preview       # serve dist/ locally
 ```
 
+## Keys
+
+- Enter: submit an answer, continue after feedback, start a session.
+- Space: skip an empty answer box; continue after an answer.
+- r: show or hide the worked route after an answer.
+- Esc: pause a session, stop on a block card, close the keys card.
+- Option + 1 to 4 (Alt on Windows and Linux): Today, Practice, Knowledge, Progress.
+- ?: the keys card.
+
 ## Install as an app
 
 - Safari on macOS: File, then Add to Dock.

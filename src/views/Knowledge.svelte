@@ -50,6 +50,8 @@
   const FACT_KIND = new Set(['fact']);
 </script>
 
+<svelte:window onkeydown={(e) => e.key === 'Escape' && detail && go('knowledge')} />
+
 <h1>Knowledge</h1>
 
 {#if detail}

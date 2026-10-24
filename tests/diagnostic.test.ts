@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   answerDiagnostic,
+  applyDiagnosticPart,
   currentItem,
   finishDiagnostic,
+  hasStartingPoint,
+  partOf,
+  partsDone,
   PROBES,
   startDiagnostic,
   type DiagnosticState,
@@ -140,5 +144,97 @@ describe('diagnostic staircase', () => {
     expect(rec.level).toBe(3);
     expect(rec.stability).toBe(3);
     expect(rec.due).toBe(now + 3 * DAY);
+  });
+});
+
+describe('diagnostic in 4 parts', () => {
+  // Run the diagnostic answering correctly up to a per-probe band cap,
+  // stopping at each part boundary.
+  function runUntilBoundary(state: State, diag: DiagnosticState, now: number, maxBand: number) {
+    const attempts: Attempt[] = [];
+    while (!diag.done && !diag.partBoundary) {
+      const q = currentItem(diag)!;
+      const good = q.band <= maxBand;
+      const out = answerDiagnostic(state, diag, good ? displayAnswer(q.answer) : 'x', 1500, now);
+      state = out.state;
+      diag = out.diagnostic;
+      attempts.push(out.attempt);
+      now += 1000;
+    }
+    return { state, diag, attempts, now };
+  }
+
+  it('partOf and partsDone track probe progress', () => {
+    expect(partOf(0)).toBe(0);
+    expect(partOf(4)).toBe(0);
+    expect(partOf(5)).toBe(1);
+    expect(partOf(19)).toBe(3);
+    let state = newState(T0);
+    const { state: s0, diagnostic } = startDiagnostic(state, T0);
+    state = s0;
+    expect(partsDone(diagnostic)).toBe(0);
+    let diag = diagnostic;
+    let now = T0;
+    ({ state, diag, now } = runUntilBoundary(state, diag, now, 3));
+    expect(diag.partBoundary).toBe(true);
+    expect(partsDone(diag)).toBe(1);
+    expect(diag.probeIndex).toBe(5);
+  });
+
+  it('applyDiagnosticPart sets levels for probed skills only and is idempotent', () => {
+    let state = newState(T0);
+    const { state: s0, diagnostic } = startDiagnostic(state, T0);
+    state = s0;
+    let now = T0;
+    let r = runUntilBoundary(state, diagnostic, now, 2);
+    state = r.state;
+    const diag = r.diag;
+    const applied = applyDiagnosticPart(state, diag, r.now);
+    // Probed skill got a level; unprobed skill untouched.
+    expect(applied.skills['tables-1-10']!.level).toBe(2);
+    expect(applied.skills['tables-1-10']!.stability).toBe(3);
+    expect(applied.skills['pct-reverse']).toBeUndefined();
+    // Same result twice.
+    const again = applyDiagnosticPart(applied, diag, r.now);
+    expect(again.skills['tables-1-10']!.due).toBe(applied.skills['tables-1-10']!.due);
+    expect(again.target).toBe(applied.target);
+    expect(hasStartingPoint(applied)).toBe(true);
+  });
+
+  it('hasStartingPoint is false before part 1 and true after', () => {
+    const s0 = newState(T0);
+    expect(hasStartingPoint(s0)).toBe(false);
+    const { state: s1, diagnostic } = startDiagnostic(s0, T0);
+    expect(hasStartingPoint(s1)).toBe(false);
+    let { state, diag } = runUntilBoundary(s1, diagnostic, T0, 2);
+    expect(hasStartingPoint({ ...state, diagnostic: diag })).toBe(true);
+  });
+
+  it('all four parts then finish produces baseline and diagnosticDone', () => {
+    let state = newState(T0);
+    const started = startDiagnostic(state, T0);
+    state = started.state;
+    let diag = started.diagnostic;
+    let now = T0;
+    const attempts: Attempt[] = [];
+    let boundaries = 0;
+    while (!diag.done) {
+      const r = runUntilBoundary(state, diag, now, 2);
+      state = r.state;
+      diag = r.diag;
+      attempts.push(...r.attempts);
+      now = r.now;
+      expect(diag.partBoundary || diag.done).toBe(true);
+      boundaries++;
+      if (!diag.done) {
+        state = { ...applyDiagnosticPart(state, diag, now), diagnostic: diag };
+        diag = { ...diag, partBoundary: false };
+      }
+    }
+    expect(boundaries).toBe(4);
+    const fin = finishDiagnostic(state, diag, attempts, now);
+    expect(fin.state.diagnosticDone).toBe(true);
+    expect(fin.state.baseline).not.toBeNull();
+    expect(hasStartingPoint(fin.state)).toBe(true);
   });
 });

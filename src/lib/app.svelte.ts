@@ -20,7 +20,9 @@ export const app = $state({
   attemptsLoaded: false,
   view: 'today' as View,
   detail: null as string | null,
+  keysOpen: false,
   practiceMode: 'session' as PracticeMode,
+  sessionShort: false,
   customSkills: [] as string[],
   customBand: null as number | null,
 });
@@ -135,8 +137,10 @@ export function startPractice(
   mode: PracticeMode,
   customSkills: string[] = [],
   customBand: number | null = null,
+  sessionShort = false,
 ): void {
   app.practiceMode = mode;
+  app.sessionShort = sessionShort;
   app.customSkills = customSkills;
   app.customBand = customBand;
   go('practice');

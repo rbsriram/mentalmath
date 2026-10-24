@@ -77,6 +77,10 @@ Base seconds, scaled by 1, 1, 1.5, 2 for bands 0 to 3:
 
 Twenty probes in a fixed order. Each starts at band 1, climbs to 2 and 3 on correct answers, drops to a single band 0 item on a band 1 miss, and ends on any band 2 or 3 miss. Skips count as wrong. Finish writes the probed level per skill, seeds stability 3 days for level 1 and up, stores the baseline report, and picks the first target.
 
+The probes run in 4 parts of 5. Each part applies the levels gathered so far and stops, so a learner can place in short sittings. After part 1 the app counts the learner as having a starting point and offers sessions; the baseline report still waits for part 4.
+
+The 10 minute plan runs recall for 2 minutes and practice for 8, with no learn, timed, or review phase.
+
 ## The benchmark
 
 Thirty nine slots: the 15 benchmark classes at bands 1 and 2, six transfer slots, three fact slots. Items use `seedFor('benchmark', month, slot)`, so a month is a fixed equated form. Reports carry accuracy, accuracy by skill and band, median and p90 on correct items, transfer accuracy, classes reliable, and retention.

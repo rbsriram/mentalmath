@@ -244,3 +244,26 @@ describe('session flow', () => {
     expect(out.session.answered).toBe(1);
   });
 });
+
+describe('short plan and resume', () => {
+  it('short plan budgets sum to 10 minutes with recall + practice only', () => {
+    const s = planSession(fixture(), T0, 42, { short: true });
+    expect(s.short).toBe(true);
+    expect(s.phases.map((p) => p.kind)).toEqual(['recall', 'practice']);
+    const total = s.phases.reduce((x, p) => x + p.budgetMs, 0);
+    expect(total).toBe(10 * MIN);
+  });
+
+  it('a paused session resumes at the same phase with the same current', () => {
+    const state = fixture();
+    const rng = createRng(8);
+    let s = planSession(state, T0, 21);
+    s = nextQuestion(state, s, rng, T0);
+    const q = currentQuestion(s)!;
+    s = pause(s);
+    const resumed = resume(s);
+    expect(resumed.phaseIndex).toBe(0);
+    expect(resumed.current).toEqual(s.current);
+    expect(currentQuestion(resumed)!.prompt).toBe(q.prompt);
+  });
+});

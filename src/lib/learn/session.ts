@@ -51,6 +51,7 @@ export interface Session {
   slow: { skill: string; method: string }[];
   completed: boolean;
   paused: boolean;
+  short: boolean; // the 10 minute plan: recall + practice only
 }
 
 export interface CurrentItem {
@@ -70,17 +71,30 @@ const BUDGETS: [PhaseKind, number][] = [
   ['timed', 5],
   ['review', 3],
 ];
+const SHORT_BUDGETS: [PhaseKind, number][] = [
+  ['recall', 2],
+  ['practice', 8],
+];
 
-export function planSession(state: State, now: number, seed: number): Session {
+export function planSession(
+  state: State,
+  now: number,
+  seed: number,
+  opts?: { short?: boolean },
+): Session {
+  const short = opts?.short === true;
   const target = chooseTarget(state);
-  let budgets = BUDGETS.map(([kind, minutes]) => ({ kind, minutes }));
-  if (target === null) {
+  let budgets = (short ? SHORT_BUDGETS : BUDGETS).map(([kind, minutes]) => ({
+    kind,
+    minutes,
+  }));
+  if (!short && target === null) {
     const learn = budgets.find((b) => b.kind === 'learn')!;
     const practice = budgets.find((b) => b.kind === 'practice')!;
     practice.minutes += learn.minutes;
     learn.minutes = 0;
   }
-  if (Object.keys(state.facts).length < 5) {
+  if (!short && Object.keys(state.facts).length < 5) {
     const recall = budgets.find((b) => b.kind === 'recall')!;
     const practice = budgets.find((b) => b.kind === 'practice')!;
     practice.minutes += recall.minutes / 2;
@@ -110,6 +124,7 @@ export function planSession(state: State, now: number, seed: number): Session {
     slow: [],
     completed: false,
     paused: false,
+    short,
   };
 }
 

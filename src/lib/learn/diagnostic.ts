@@ -52,12 +52,32 @@ export interface DiagEntry {
   ms: number;
 }
 
+export const PARTS = 4;
+const PROBES_PER_PART = PROBES.length / PARTS; // 5
+
+// Which of the 4 parts a probe index belongs to (0-based).
+export function partOf(probeIndex: number): number {
+  return Math.floor(probeIndex / PROBES_PER_PART);
+}
+
+// Completed parts, 0 to 4.
+export function partsDone(diag: DiagnosticState): number {
+  return Math.min(PARTS, Math.floor(diag.probeIndex / PROBES_PER_PART));
+}
+
+// A part boundary was just crossed (or the diagnostic finished).
+export function partComplete(diag: DiagnosticState): boolean {
+  return diag.partBoundary;
+}
+
 export interface DiagnosticState {
   createdAt: number;
   probeIndex: number;
   itemIndex: number; // item within the current probe
   band: Band;
   history: DiagEntry[];
+  // True between the answer that completed a part and the next item.
+  partBoundary: boolean;
   done: boolean;
 }
 
@@ -71,6 +91,7 @@ export function startDiagnostic(
     itemIndex: 0,
     band: 1,
     history: [],
+    partBoundary: false,
     done: false,
   };
   return { state: { ...state, diagnostic }, diagnostic };
@@ -132,21 +153,67 @@ export function answerDiagnostic(
     band = correct ? ((band + 1) as Band) : (0 as Band);
     itemIndex += 1;
   }
+  // A boundary is crossed when the probe index lands on a multiple of 5
+  // (or the run finished). Cleared on the next answered item.
+  const partBoundary =
+    probeIndex > diag.probeIndex && probeIndex % PROBES_PER_PART === 0;
 
+  const nextDiag: DiagnosticState = {
+    ...diag,
+    probeIndex,
+    itemIndex,
+    band,
+    history,
+    partBoundary,
+    done,
+  };
   return {
-    state: out.state,
-    diagnostic: {
-      ...diag,
-      probeIndex,
-      itemIndex,
-      band,
-      history,
-      done,
-    },
+    // The updated diagnostic goes back into the state document so a part
+    // boundary (or a page reload) resumes where the learner stopped.
+    state: { ...out.state, diagnostic: nextDiag },
+    diagnostic: nextDiag,
     attempt: out.attempt,
     result: out.result,
     question,
   };
+}
+
+// Applies the levels learned so far without finishing the diagnostic:
+// every probed skill gets the highest band answered correctly, and level
+// >= 1 gets a 3 day starting stability. Idempotent: the same history always
+// produces the same records. Picks the target so Tomorrow has one.
+export function applyDiagnosticPart(
+  state: State,
+  diag: DiagnosticState,
+  now: number,
+): State {
+  const skills = { ...state.skills };
+  PROBES.forEach((probe, i) => {
+    const entries = diag.history.filter((h) => h.probe === i);
+    if (entries.length === 0) return;
+    const level = entries.reduce<Band>(
+      (hi, e) => (e.correct && e.band > hi ? e.band : hi),
+      0,
+    ) as Band;
+    const cur = skills[probe.skill] ?? newRec();
+    const next = { ...cur, level };
+    if (level >= 1) {
+      next.stability = 3;
+      next.due = now + 3 * DAY_MS;
+    }
+    skills[probe.skill] = next;
+  });
+  const withSkills: State = { ...state, skills };
+  return { ...withSkills, target: chooseTarget(withSkills) };
+}
+
+// The learner has a starting point once the diagnostic is done or the
+// first part is in the books.
+export function hasStartingPoint(state: State): boolean {
+  return (
+    state.diagnosticDone ||
+    (state.diagnostic !== null && partsDone(state.diagnostic) >= 1)
+  );
 }
 
 // Sets each probed skill's level to the highest band answered correctly.

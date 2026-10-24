@@ -14,8 +14,11 @@
   } from '../lib/learn/benchmark';
   import {
     answerDiagnostic,
+    applyDiagnosticPart,
     currentItem,
     finishDiagnostic,
+    partOf,
+    partsDone,
     startDiagnostic,
     type DiagnosticState,
   } from '../lib/learn/diagnostic';
@@ -106,16 +109,43 @@
       : null,
   );
 
-  const header = $derived(
+  const blockLabel = $derived(
     mode === 'session'
       ? phase
-        ? `${cap(phase.kind)}, ${Math.max(0, Math.ceil((phase.budgetMs - phase.elapsedMs) / 60000))} min left`
+        ? cap(phase.kind)
         : 'Session'
       : mode === 'diagnostic'
-        ? `Diagnostic, item ${(diag?.history.length ?? 0) + 1}`
+        ? 'Diagnostic'
         : mode === 'benchmark'
-          ? `Benchmark, ${(bench?.slotIndex ?? 0) + 1} of ${BENCHMARK_SLOTS.length}`
+          ? 'Benchmark'
           : (skillName.get(app.customSkills[0] ?? '') ?? 'Custom practice'),
+  );
+
+  const corner = $derived.by(() => {
+    if (mode === 'session' && session && phase) {
+      if (interstitial !== null || session.completed) {
+        return `${Math.round(phase.budgetMs / 60000)} min`;
+      }
+      const left = Math.max(0, phase.budgetMs - phase.elapsedMs);
+      const m = Math.floor(left / 60000);
+      const sec = Math.floor((left % 60000) / 1000);
+      return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+    if (mode === 'diagnostic' && diag) {
+      return `Part ${Math.min(4, partOf(diag.probeIndex) + 1)} of 4`;
+    }
+    if (mode === 'benchmark' && bench) {
+      return `${bench.slotIndex + 1} of ${BENCHMARK_SLOTS.length}`;
+    }
+    return '';
+  });
+  const cornerLow = $derived(
+    mode === 'session' &&
+      session !== null &&
+      phase !== null &&
+      interstitial === null &&
+      !session.completed &&
+      phase.budgetMs - phase.elapsedMs <= 60_000,
   );
 
   const learnMethod = $derived(
@@ -137,9 +167,13 @@
   // cannot be missed even if the question already unmounted.
   let finishing = $state(false);
   $effect(() => {
-    if (mode === 'diagnostic' && diag?.done && !finishing) {
+    if (mode === 'diagnostic' && diag && (diag.done || diag.partBoundary) && !finishing) {
       finishing = true;
-      void finishDiag();
+      if (diag.done) void finishDiag();
+      else {
+        commit(applyDiagnosticPart(app.state!, diag, Date.now()));
+        go('today');
+      }
     }
     if (mode === 'benchmark' && bench?.done && !finishing) {
       finishing = true;
@@ -170,7 +204,9 @@
         if (s !== null && !s.completed) {
           commit(finishSession(st, s, now));
         }
-        s = planSession(app.state!, now, Math.floor(rng.next() * 2147483647));
+        s = planSession(app.state!, now, Math.floor(rng.next() * 2147483647), {
+          short: app.sessionShort,
+        });
       }
       session = s;
       if (session.current === null) {
@@ -349,6 +385,26 @@
     saveSession(session.paused ? resume(session) : pause(session));
   }
 
+  function stopForNow() {
+    if (session) saveSession(pause(session));
+    go('today');
+  }
+
+  function onCardKey(e: KeyboardEvent) {
+    if (interstitial !== null) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        continuePhase();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        stopForNow();
+      }
+    } else if (showLesson && e.key === 'Enter') {
+      e.preventDefault();
+      lessonContinue();
+    }
+  }
+
   function endRun() {
     if (mode === 'session' && session) {
       commit(finishSession(app.state!, session, Date.now()));
@@ -379,7 +435,12 @@
   }
 </script>
 
-<p class="muted" style="margin-top:0.5rem">{header}</p>
+<svelte:window onkeydown={onCardKey} />
+
+<p class="muted" style="margin-top:0.5rem">{blockLabel}</p>
+{#if corner}
+  <div class="corner" class:low={cornerLow}>{corner}</div>
+{/if}
 
 {#if mode === 'session' && session}
   {#if session.completed}
@@ -404,6 +465,7 @@
         </p>
       {/each}
       <button onclick={continuePhase}>Continue</button>
+      <button class="secondary" onclick={stopForNow}>Stop for now</button>
     </div>
   {:else if showLesson && learnMethod}
     <MethodCard method={learnMethod} />
