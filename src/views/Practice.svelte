@@ -391,6 +391,24 @@
   }
 
   function onCardKey(e: KeyboardEvent) {
+    if (app.keysOpen) return;
+    if (
+      e.key === 'Escape' &&
+      mode === 'session' &&
+      session &&
+      !session.paused &&
+      !session.completed &&
+      interstitial === null
+    ) {
+      e.preventDefault();
+      togglePause();
+      return;
+    }
+    if (mode === 'session' && session?.paused && e.key === 'Enter') {
+      e.preventDefault();
+      togglePause();
+      return;
+    }
     if (interstitial !== null) {
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -467,11 +485,11 @@
   {:else}
     <div class="card"><p class="muted">Preparing...</p></div>
   {/if}
-  <p>
-    <button class="secondary" onclick={togglePause}>
-      {session.paused ? 'Resume' : 'Pause'}
-    </button>
-  </p>
+  {#if !session.paused && !session.completed && interstitial === null}
+    <p>
+      <button class="secondary" onclick={togglePause}>Pause</button>
+    </p>
+  {/if}
 {:else if mode === 'diagnostic' && diag}
   {#if question}
     <Question {question} {onSubmit} {onNext} skippable />

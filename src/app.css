@@ -677,3 +677,11 @@ ol.route li {
     animation: none !important;
   }
 }
+
+/* On wide screens the nav is at the top, so the pills sit below it. */
+@media (min-width: 641px) {
+  .corner,
+  .blocklabel {
+    top: calc(var(--nav-h, 45px) + 0.5rem);
+  }
+}

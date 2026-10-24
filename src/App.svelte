@@ -5,8 +5,6 @@
   import Practice from './views/Practice.svelte';
   import Knowledge from './views/Knowledge.svelte';
   import Progress from './views/Progress.svelte';
-  import { pause } from './lib/learn/session';
-  import { commit } from './lib/app.svelte';
   import Keys from './components/Keys.svelte';
 
   const NAV: { view: 'today' | 'practice' | 'knowledge' | 'progress'; label: string }[] = [
@@ -42,9 +40,6 @@
       e.preventDefault();
       app.keysOpen = true;
       return;
-    }
-    if (e.key === 'Escape' && app.state?.session && !app.state.session.completed) {
-      commit({ ...app.state, session: pause(app.state.session) });
     }
   }
 

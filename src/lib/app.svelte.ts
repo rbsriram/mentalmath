@@ -116,6 +116,7 @@ export function flush(): void {
 export function syncFromHash(): void {
   const hash = location.hash.replace(/^#/, '');
   const [head, ...rest] = hash.split('/');
+  const before = app.view;
   if (head === 'practice' || head === 'knowledge' || head === 'progress' || head === 'today') {
     app.view = head;
     app.detail = head === 'knowledge' && rest.length > 0 ? rest.join('/') : null;
@@ -123,6 +124,7 @@ export function syncFromHash(): void {
     app.view = 'today';
     app.detail = null;
   }
+  if (app.view !== before) window.scrollTo(0, 0);
 }
 
 export function go(view: View, detail: string | null = null): void {
