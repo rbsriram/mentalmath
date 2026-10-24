@@ -7,38 +7,42 @@ Last updated: 2026-10-24
 
 ## Where it is
 
-Project started 2026-10-24. The spec is `docs/mental-math-devin-brief.md`. The foundation source is `docs/mental-math-base-load-cheatsheet.pdf`. The stack review is done (see `docs/DECISIONS.md` #1 to #4). Implementation is in progress. Nothing runs yet.
+Built in one day on 2026-10-24 from `docs/mental-math-devin-brief.md`. The app runs, builds, and installs as a PWA. The full loop works end to end in a production build driven by headless Chrome: first-run diagnostic (40 items), a 30-minute session through all five phases (recall, learn with a lesson card, practice, timed, review), the Today summary, Knowledge detail pages, and Progress. 360 Vitest tests pass, including a template sweep of about 90,000 seeded questions against independent oracles and a scripted-learner simulation of a diagnostic plus three sessions.
+
+Not yet done by a human: a real 30-minute session on a phone, and a monthly benchmark run (the code path is tested in isolation, not in the browser).
 
 No git remote exists. The state lives on one machine only until a remote is added.
 
 ## How it is built (one breath)
 
-A static PWA. Svelte 5 + TypeScript + Vite 8, runtime dependency `svelte` only. Pure TypeScript modules do the work: exact rational arithmetic (BigInt), a seeded RNG, parameterized question templates with worked routes, a skill graph with a method catalog, an inspectable mastery model with a spaced scheduler, a 30-minute session state machine, a first-run diagnostic, and a monthly equated benchmark. Learner data is one versioned JSON document plus an append-only attempt log in IndexedDB, with JSON export and import. A hand-written service worker gives offline use.
+A static PWA. Svelte 5 + TypeScript + Vite 8, runtime dependency `svelte` only (`docs/DECISIONS.md` #1). Pure TypeScript under `src/lib`: exact rational arithmetic with BigInt, a seeded RNG with namespaced seeds, 45 question templates with worked routes, a 58-node skill graph, 41 method cards whose examples are generated rather than typed, an inspectable mastery model with spaced review, a five-bucket scheduler, a 30-minute session machine, the diagnostic staircase, and the equated monthly benchmark. Learner data is one versioned JSON document plus an append-only attempt log in IndexedDB, with JSON export and import (#2). A hand-written service worker gives offline use (#3). Four views on a runes store with hash routing. Rules are written up in `docs/algorithm.md`; sources in `docs/content-sources.md`.
 
 ## Run and test
 
-Planned commands (confirm once the scaffold lands):
-
 - `fnm use` then `pnpm install`
-- `pnpm dev` : local dev server
-- `pnpm test` : Vitest
+- `pnpm dev` : dev server on http://localhost:5173
+- `pnpm test` : Vitest (360 tests, about 3 s)
 - `pnpm check` : svelte-check
-- `pnpm build` then `pnpm preview` : production build
+- `pnpm build` then `pnpm preview --port 4173` : production build
+- Browser harness used for verification: `node /tmp/mm-cdp.mjs 'http://localhost:4173/?harness=1' full` (headless Chrome over CDP, screenshots in `/tmp/mm-shots/`). It lives in `/tmp`, so it is lost on reboot. `?harness=1` exposes `window.__mm` with `currentAnswer`, `session`, `state`, and `fastForward`.
 
 ## Known limitations
 
 - A browser engine is the memory floor. A terminal UI would be lighter, but the brief requires mobile use (#1).
 - Real file writes are not portable from Safari or iOS. Flat data lives in IndexedDB; export produces the file (#2).
 - TypeScript 7 is not supported by svelte-check 4.7.x, so the project uses TypeScript 6 (#4).
+- The diagnostic staircase ends most probes on a wrong answer, so freshly probed skills show as "learning" and are drilled as fragile prerequisites in the first sessions. This washes out after a few days.
+- The bundle is about 58 KB gzipped. Most of it is content and templates; no code splitting yet.
+- Only `^2` and `^3` in method text use Unicode superscripts; other exponents print as `2^10`.
 
 ## Next / in flight
 
-1. Scaffold the project with pinned versions and build the math core, content, templates, and tests.
-2. Build the learning layer (model, scheduler, session, diagnostic, benchmark) and the storage layer.
-3. Build the four views, the service worker, the README, and the algorithm and content-source docs.
+1. Add a GitHub remote and enable Pages (workflow is in `.github/workflows/pages.yml`, base path `/mentalmath/`).
+2. Use it for real for a week. Watch the speed targets in `src/lib/learn/targets.ts` and the bucket weights in `src/lib/learn/scheduler.ts`; both are constants meant to be tuned from experience.
+3. Run one monthly benchmark in the browser when it comes due (30 days after first use) and check the Progress table.
 
 ## Open threads / decisions needed
 
-- Add a git remote (GitHub) so state is not single-machine. Needs the user.
-- Hosting for daily use: `pnpm preview` locally or GitHub Pages. The build supports both with a base-path variable.
+- Hosting for daily use: `pnpm preview` locally or GitHub Pages. The build supports both with the `BASE_PATH` variable.
 - If the user drops the mobile requirement, a terminal UI becomes the lighter stack (#1).
+- Whether to split the bundle (content and templates) if load time on a phone ever matters.

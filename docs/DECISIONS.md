@@ -32,4 +32,16 @@ Each entry is numbered so STATE.md and code comments can reference it (e.g. "see
 
 **Why:** Each version is at least 15 days old on 2026-10-24. TypeScript 7 (the Go port) is the npm `latest`, but svelte-check 4.7.x declares a peer range of `^5 || ^6`, so TypeScript 6 is the newest supported line.
 
+## #5 — Knowledge propagates from dependents to prerequisites (2026-10-24)
+
+**Decision:** A skill is unlocked when every prerequisite is known directly or implied. A prerequisite is implied when any skill that depends on it is known. Concepts with no exercises (such as place value) never gate. Implied skills are not teaching targets. The Knowledge view shows them as "implied".
+
+**Why:** The diagnostic probes 20 skills. The first rule ("every prerequisite must be practiced and known") left most of the graph locked forever, because basic skills such as left-to-right addition were never probed and place value has no exercise at all. A learner who multiplies 47 × 23 correctly has shown the distributive split and left-to-right addition. The rule is one sentence and stays inspectable. Details: `docs/algorithm.md`.
+
+## #6 — Assessments give no per-item feedback (2026-10-24)
+
+**Decision:** The diagnostic and the monthly benchmark record each answer and move on. Only practice sessions show the correct answer and the worked route.
+
+**Why:** An assessment measures. Showing answers during it teaches to the test and slows a 40-item run. It also removes a failure mode where the last item has no next question to continue to.
+
 <!-- copy the block above for each new decision; never edit or delete past entries -->
