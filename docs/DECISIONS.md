@@ -44,4 +44,10 @@ Each entry is numbered so STATE.md and code comments can reference it (e.g. "see
 
 **Why:** An assessment measures. Showing answers during it teaches to the test and slows a 40-item run. It also removes a failure mode where the last item has no next question to continue to.
 
+## #7 — Light illustrated theme by default (2026-10-24)
+
+**Decision:** The default theme is light, with the user's three pastel illustrations as page backgrounds (WebP, 1600 and 900 px, under `public/bg/`). Cards and the nav are translucent white over the images. Dark stays plain with no image. The state document moved to version 2; a v1 `system` theme migrates to `light`.
+
+**Why:** The light illustrated look is the intended default. Versioning the theme default instead of re-reading user settings keeps a stored `dark` or `system` choice intact and only moves the v1 `system` default.
+
 <!-- copy the block above for each new decision; never edit or delete past entries -->

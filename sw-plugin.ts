@@ -19,13 +19,20 @@ export function serviceWorkerPlugin(): Plugin {
         names.push('./' + file);
       }
       // Public-dir files are copied beside the bundle, not listed in it.
-      try {
-        for (const file of readdirSync(join(process.cwd(), 'public'))) {
-          names.push('./' + file);
+      // Recurse one level so public/bg/ assets are precached too.
+      const pubDir = join(process.cwd(), 'public');
+      const walk = (dir: string, prefix: string): string[] => {
+        try {
+          return readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+            e.isDirectory()
+              ? walk(join(dir, e.name), `${prefix}${e.name}/`)
+              : [`${prefix}${e.name}`],
+          );
+        } catch {
+          return [];
         }
-      } catch {
-        // no public dir
-      }
+      };
+      names.push(...walk(pubDir, './'));
       const hash = createHash('sha256')
         .update(JSON.stringify(names))
         .digest('hex')

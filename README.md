@@ -55,6 +55,7 @@ The repo carries `.github/workflows/pages.yml`. It only matters once a GitHub re
 - `src/components/` question runner, route display, method cards, bars, fact grids.
 - `src/views/` Today, Practice, Knowledge, Progress.
 - `tests/` Vitest suite.
+- `public/` PWA manifest, icons, `bg/` illustrated page backgrounds.
 - `docs/` brief, decisions, state, algorithm notes, content sources.
 
 ## Docs

@@ -8,20 +8,20 @@ const T0 = new Date(2025, 0, 10, 9, 0, 0).getTime();
 describe('newState and migrate', () => {
   it('builds a versioned empty document', () => {
     const s = newState(T0);
-    expect(s.version).toBe(1);
+    expect(s.version).toBe(2);
     expect(s.createdAt).toBe(T0);
     expect(s.skills).toEqual({});
     expect(s.facts).toEqual({});
     expect(s.sessions).toEqual([]);
     expect(s.benchmarks).toEqual([]);
     expect(s.diagnosticDone).toBe(false);
-    expect(s.settings.theme).toBe('system');
+    expect(s.settings.theme).toBe('light');
   });
 
   it('migrate accepts a valid v1 document', () => {
     const s = newState(T0);
     const round = migrate(JSON.parse(JSON.stringify(s)));
-    expect(round.version).toBe(1);
+    expect(round.version).toBe(2);
     expect(round.createdAt).toBe(T0);
   });
 
@@ -81,5 +81,27 @@ describe('recFor and recordOutcome', () => {
     for (const s of q.skills) {
       expect(out.state.skills[s]!.attempts).toBe(1);
     }
+  });
+});
+
+describe('version 2 migration', () => {
+  it('a v1 document with system theme migrates to v2 light', () => {
+    const v1 = { ...newState(T0), version: 1, settings: { theme: 'system' } };
+    const doc = migrate(v1);
+    expect(doc.version).toBe(2);
+    expect(doc.settings.theme).toBe('light');
+  });
+
+  it('a v1 document with dark theme keeps dark', () => {
+    const v1 = { ...newState(T0), version: 1, settings: { theme: 'dark' } };
+    const doc = migrate(v1);
+    expect(doc.settings.theme).toBe('dark');
+  });
+
+  it('a v2 document passes through untouched', () => {
+    const s = newState(T0);
+    const doc = migrate(s);
+    expect(doc.version).toBe(2);
+    expect(doc.settings.theme).toBe('light');
   });
 });

@@ -437,11 +437,12 @@
 
 <svelte:window onkeydown={onCardKey} />
 
-<p class="muted" style="margin-top:0.5rem">{blockLabel}</p>
+<span class="blocklabel">{blockLabel}</span>
 {#if corner}
   <div class="corner" class:low={cornerLow}>{corner}</div>
 {/if}
 
+<div class="runner">
 {#if mode === 'session' && session}
   {#if session.completed}
     <div class="card">
@@ -501,3 +502,4 @@
   {/if}
   <p><button class="secondary" onclick={endRun}>End</button></p>
 {/if}
+</div>

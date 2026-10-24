@@ -48,6 +48,23 @@
     }
   }
 
+  // The illustrated background, one image per view. Only the active
+  // view's image is requested. Dark themes hide the layer in CSS.
+  const BG_IMG: Record<string, number> = {
+    today: 1,
+    practice: 3,
+    knowledge: 2,
+    progress: 2,
+  };
+  function bgUrl(): string {
+    const n = BG_IMG[app.view] ?? 1;
+    const w =
+      typeof window === 'undefined'
+        ? 1200
+        : window.innerWidth * (window.devicePixelRatio || 1);
+    return `${import.meta.env.BASE_URL}bg/bg-${n}-${w > 1000 ? 1600 : 900}.webp`;
+  }
+
   onMount(() => {
     void init();
     const onHash = () => syncFromHash();
@@ -63,9 +80,8 @@
   });
 
   $effect(() => {
-    const theme = app.state?.settings.theme ?? 'system';
-    if (theme === 'system') document.documentElement.removeAttribute('data-theme');
-    else document.documentElement.setAttribute('data-theme', theme);
+    const theme = app.state?.settings.theme ?? 'light';
+    document.documentElement.setAttribute('data-theme', theme);
   });
 </script>
 
@@ -76,6 +92,8 @@
     <a href="#{item.view}" class:active={app.view === item.view}>{item.label}</a>
   {/each}
 </nav>
+
+<div class="bg" style={`--bg-url: url("${bgUrl()}")`} aria-hidden="true"></div>
 
 {#if app.keysOpen}
   <Keys />

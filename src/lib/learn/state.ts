@@ -27,7 +27,7 @@ export interface SessionSummary {
 }
 
 export interface State {
-  version: 1;
+  version: 2;
   createdAt: number;
   skills: Record<string, Rec>;
   facts: Record<string, Rec>;
@@ -44,7 +44,7 @@ export interface State {
 
 export function newState(now: number): State {
   return {
-    version: 1,
+    version: 2,
     createdAt: now,
     skills: {},
     facts: {},
@@ -56,14 +56,23 @@ export function newState(now: number): State {
     diagnosticDone: false,
     baseline: null,
     benchmarks: [],
-    settings: { theme: 'system' },
+    settings: { theme: 'light' },
   };
 }
 
-// Migrations from version N to N+1. Empty: v1 is the only version so far.
-export const MIGRATIONS: Record<number, (s: unknown) => unknown> = {};
+// Migrations from version N to N+1.
+// v1 -> v2: the illustrated light theme is the default. A v1 'system'
+// theme becomes 'light'; anything else passes through.
+export const MIGRATIONS: Record<number, (s: unknown) => unknown> = {
+  1: (doc) => {
+    const d = doc as Record<string, unknown>;
+    const settings = { ...((d.settings ?? {}) as Record<string, unknown>) };
+    if (settings.theme === 'system') settings.theme = 'light';
+    return { ...d, settings, version: 2 };
+  },
+};
 
-const LATEST_VERSION = 1;
+const LATEST_VERSION = 2;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
