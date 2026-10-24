@@ -68,6 +68,8 @@
     URL.revokeObjectURL(url);
   }
 
+  let fileInput = $state<HTMLInputElement | null>(null);
+
   async function doImport(e: Event) {
     const input = e.target as HTMLInputElement;
     const file = input.files?.[0];
@@ -209,10 +211,8 @@
 <h2>Data</h2>
 <div class="card" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
   <button class="secondary" onclick={doExport}>Export</button>
-  <label class="chip" style="padding:0.6rem 1rem;min-height:44px;display:inline-flex;align-items:center;cursor:pointer">
-    Import
-    <input type="file" accept="application/json" onchange={doImport} style="display:none" />
-  </label>
+  <button class="secondary" onclick={() => fileInput?.click()}>Import</button>
+  <input bind:this={fileInput} type="file" accept="application/json" onchange={doImport} style="display:none" />
   <button class="secondary" onclick={doReset}>Reset</button>
   <select
     value={st.settings.theme}
