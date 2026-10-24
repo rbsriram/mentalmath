@@ -24,6 +24,13 @@ export const app = $state({
   updateReady: false,
   practiceMode: 'session' as PracticeMode,
   sessionShort: false,
+  // One-shot intent set by startPractice and consumed by the Practice
+  // view; cleared whenever the view changes away from practice.
+  practiceExplicit: false,
+  // Focus mode: a run owns the screen (nav hidden) until it ends or
+  // Stop takes the user back to runOrigin.
+  running: false,
+  runOrigin: 'today' as 'today' | 'practice',
   customSkills: [] as string[],
   customBand: null as number | null,
 });
@@ -124,6 +131,7 @@ export function syncFromHash(): void {
     app.view = 'today';
     app.detail = null;
   }
+  if (app.view !== 'practice') app.practiceExplicit = false;
   if (app.view !== before) window.scrollTo(0, 0);
 }
 
@@ -141,11 +149,15 @@ export function startPractice(
   customSkills: string[] = [],
   customBand: number | null = null,
   sessionShort = false,
+  runOrigin: 'today' | 'practice' = 'today',
 ): void {
   app.practiceMode = mode;
+  app.practiceExplicit = true;
   app.sessionShort = sessionShort;
   app.customSkills = customSkills;
   app.customBand = customBand;
+  app.runOrigin = runOrigin;
+  app.running = true;
   go('practice');
 }
 

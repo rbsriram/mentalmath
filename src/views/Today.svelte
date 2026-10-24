@@ -1,10 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { app, startPractice } from '../lib/app.svelte';
+  import { app, go, startPractice } from '../lib/app.svelte';
   import { SKILLS } from '../lib/content/skills';
   import { benchmarkDue } from '../lib/learn/benchmark';
   import { hasStartingPoint, PART_LABELS, partsDone } from '../lib/learn/diagnostic';
-  import { practicable } from '../lib/learn/scheduler';
   import { planSession, type Session } from '../lib/learn/session';
   import { localDay } from '../lib/learn/model';
   import type { State } from '../lib/learn/state';
@@ -13,15 +12,6 @@
   const now = Date.now();
 
   const skillName = new Map(SKILLS.map((s) => [s.id, s.name]));
-  const FAMILY_NAME: Record<number, string> = {
-    1: 'Foundations',
-    2: 'Addition and subtraction',
-    3: 'Multiplication',
-    4: 'Division and decimals',
-    5: 'Fractions',
-    6: 'Percents and ratios',
-    7: 'Estimation and chains',
-  };
 
   const today = $derived(
     new Date(now).toLocaleDateString(undefined, {
@@ -59,8 +49,6 @@
       : null,
   );
 
-  let customSkill = $state('');
-  let customBand = $state('auto');
   let btnStart = $state<HTMLButtonElement | null>(null);
   let btnContinue = $state<HTMLButtonElement | null>(null);
   let btnDiag = $state<HTMLButtonElement | null>(null);
@@ -75,18 +63,6 @@
     else (btnStart ?? btnDiag)?.focus();
   });
 
-  const families = $derived(
-    [...new Set(SKILLS.map((s) => s.family))].sort() as number[],
-  );
-  const practicableByFamily = $derived(
-    new Map(
-      families.map((f) => [
-        f,
-        SKILLS.filter((s) => s.family === f && practicable(s.id)),
-      ]),
-    ),
-  );
-
   function fmtPhase(kind: string): string {
     return kind[0]!.toUpperCase() + kind.slice(1);
   }
@@ -99,11 +75,6 @@
     startPractice('session', [], null, true);
   }
 
-  function startCustom() {
-    if (!customSkill) return;
-    const band = customBand === 'auto' ? null : Number(customBand);
-    startPractice('custom', [customSkill], band);
-  }
 </script>
 
 <h1>Today</h1>
@@ -157,7 +128,7 @@
           . New method: {skillName.get(completedSummary.newMethod) ?? completedSummary.newMethod}
         {/if}
       </p>
-      <button class="secondary" onclick={() => startPractice('custom', SKILLS.filter((s) => practicable(s.id)).map((s) => s.id))}>
+      <button class="secondary" onclick={() => go('practice')}>
         Practice more
       </button>
     </div>
@@ -198,27 +169,4 @@
     </div>
   {/if}
 
-  <div class="card">
-    <h3 style="margin-top:0">Custom practice</h3>
-    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
-      <select bind:value={customSkill} aria-label="Skill">
-        <option value="">Choose a skill</option>
-        {#each families as f}
-          <optgroup label={FAMILY_NAME[f] ?? `Family ${f}`}>
-            {#each practicableByFamily.get(f) ?? [] as s}
-              <option value={s.id}>{s.name}</option>
-            {/each}
-          </optgroup>
-        {/each}
-      </select>
-      <select bind:value={customBand} aria-label="Band">
-        <option value="auto">Auto band</option>
-        <option value="0">Band 0</option>
-        <option value="1">Band 1</option>
-        <option value="2">Band 2</option>
-        <option value="3">Band 3</option>
-      </select>
-      <button onclick={startCustom} disabled={!customSkill}>Start</button>
-    </div>
-  </div>
 {/if}

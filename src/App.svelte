@@ -78,15 +78,21 @@
     const theme = app.state?.settings.theme ?? 'light';
     document.documentElement.setAttribute('data-theme', theme);
   });
+
+  $effect(() => {
+    document.body.classList.toggle('running', app.running);
+  });
 </script>
 
 <svelte:window onkeydown={onKey} />
 
-<nav>
-  {#each NAV as item}
-    <a href="#{item.view}" class:active={app.view === item.view}>{item.label}</a>
-  {/each}
-</nav>
+{#if !app.running}
+  <nav>
+    {#each NAV as item}
+      <a href="#{item.view}" class:active={app.view === item.view}>{item.label}</a>
+    {/each}
+  </nav>
+{/if}
 
 <div class="bg" style={`--bg-url: url("${bgUrl()}")`} aria-hidden="true"></div>
 

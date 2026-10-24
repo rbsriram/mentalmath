@@ -289,6 +289,11 @@ input[type='text'].answer {
   }
 }
 
+/* Focus mode: nav is hidden, so the panel owns the full height. */
+body.running main {
+  --nav-h: 0px;
+}
+
 /* Short panels center vertically; tall ones start at the top and
    scroll, since auto margins collapse to zero on overflow. */
 .panel {

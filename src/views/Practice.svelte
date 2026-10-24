@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import { app, commit, commitQuiet, go, harnessHook, loadAttempts, logAttempt } from '../lib/app.svelte';
+  import { app, commit, commitQuiet, go, harnessHook, loadAttempts, logAttempt, startPractice } from '../lib/app.svelte';
   import { METHODS } from '../lib/content/methods';
   import { SKILLS } from '../lib/content/skills';
   import type { CheckResult } from '../lib/engine/answer';
@@ -17,12 +17,13 @@
     applyDiagnosticPart,
     currentItem,
     finishDiagnostic,
+    hasStartingPoint,
     partOf,
     partsDone,
     startDiagnostic,
     type DiagnosticState,
   } from '../lib/learn/diagnostic';
-  import { pickQuestion } from '../lib/learn/scheduler';
+  import { practicable, pickQuestion } from '../lib/learn/scheduler';
   import {
     advanceIfOver,
     answer,
@@ -37,17 +38,28 @@
     type Session,
   } from '../lib/learn/session';
   import { localDay } from '../lib/learn/model';
-  import { recordOutcome, type State } from '../lib/learn/state';
+  import { recordOutcome } from '../lib/learn/state';
   import { displayAnswer } from '../lib/math/format';
   import { createRng } from '../lib/math/rng';
   import type { Question as Q } from '../lib/engine/types';
   import MethodCard from '../components/MethodCard.svelte';
   import Question from '../components/Question.svelte';
 
-  const mode = app.practiceMode;
+  type Mode = 'idle' | 'session' | 'diagnostic' | 'benchmark' | 'custom';
+
   const skillName = new Map(SKILLS.map((s) => [s.id, s.name]));
   const methodFor = new Map(METHODS.map((m) => [m.skill, m]));
+  const FAMILY_NAME: Record<number, string> = {
+    1: 'Foundations',
+    2: 'Addition and subtraction',
+    3: 'Multiplication',
+    4: 'Division and decimals',
+    5: 'Fractions',
+    6: 'Percents and ratios',
+    7: 'Estimation and chains',
+  };
 
+  let mode = $state<Mode>('idle');
   let session = $state<Session | null>(null);
   let shown = $state<Q | null>(null); // the question on screen; survives answering
   let diag = $state<DiagnosticState | null>(null);
@@ -61,9 +73,33 @@
   let seenPhase = $state(-1);
   let slowSeen = $state(0); // count of slow entries already shown
 
+  // Chooser state (idle mode).
+  let pickSkill = $state('');
+  let pickBand = $state('auto');
+
   const rng = createRng(Date.now() % 2147483647);
 
   const st = $derived(app.state!);
+
+  const families = $derived([...new Set(SKILLS.map((s) => s.family))].sort());
+  const practicableByFamily = $derived(
+    new Map(
+      families.map((f) => [
+        f,
+        SKILLS.filter((s) => s.family === f && practicable(s.id)),
+      ]),
+    ),
+  );
+  const sessionLive = $derived(
+    st.session !== null &&
+      !st.session.completed &&
+      st.session.date === localDay(Date.now()),
+  );
+  const sessionDoneMin = $derived(
+    sessionLive
+      ? Math.floor(st.session!.phases.reduce((x, p) => x + p.elapsedMs, 0) / 60000)
+      : 0,
+  );
 
   // Question objects must be stable across ticks: only regenerate when the
   // served item itself changes (key = template|seed|band|factId, or the
@@ -94,7 +130,9 @@
         ? diagQuestion
         : mode === 'benchmark'
           ? benchQuestion
-          : customQ,
+          : mode === 'custom'
+            ? customQ
+            : null,
   );
   // Keep `shown` pointing at the served question. Answering clears
   // session.current but not shown, so the feedback card stays mounted
@@ -192,51 +230,69 @@
     saveSession(s);
   }
 
-  onMount(() => {
+  // Mode comes from state, not from the last startPractice call: explicit
+  // starts keep their mode, in-flight assessments resume, nothing starts
+  // a session before the first diagnostic part is in.
+  function begin() {
     const now = Date.now();
-    if (mode === 'session') {
-      let s = st.session;
-      if (
-        s === null ||
-        s.completed ||
-        s.date !== localDay(now)
-      ) {
-        if (s !== null && !s.completed) {
-          commit(finishSession(st, s, now));
+    const s = app.state!;
+    const diagInFlight = s.diagnostic !== null && !s.diagnosticDone;
+    const benchInFlight = s.benchmark !== null && !s.benchmark.done;
+    const explicit = app.practiceExplicit;
+    app.practiceExplicit = false;
+
+    let m: Mode;
+    if (explicit && app.practiceMode === 'custom') m = 'custom';
+    else if (benchInFlight) m = 'benchmark';
+    else if (diagInFlight && !hasStartingPoint(s)) m = 'diagnostic';
+    else if (explicit && app.practiceMode === 'diagnostic' && diagInFlight)
+      m = 'diagnostic';
+    else if (!hasStartingPoint(s)) m = 'diagnostic';
+    else if (explicit && app.practiceMode === 'session') m = 'session';
+    else if (explicit && app.practiceMode === 'benchmark') m = 'benchmark';
+    else if (explicit && app.practiceMode === 'diagnostic') m = 'diagnostic';
+    else m = 'idle';
+    mode = m;
+    app.running = m !== 'idle';
+
+    if (m === 'session') {
+      let ses = s.session;
+      if (ses === null || ses.completed || ses.date !== localDay(now)) {
+        if (ses !== null && !ses.completed) {
+          commit(finishSession(s, ses, now));
         }
-        s = planSession(app.state!, now, Math.floor(rng.next() * 2147483647), {
+        ses = planSession(app.state!, now, Math.floor(rng.next() * 2147483647), {
           short: app.sessionShort,
         });
       }
-      session = s;
+      if (ses.paused) ses = resume(ses);
+      session = ses;
       if (session.current === null) {
         session = nextQuestion(app.state!, session, rng, now);
       }
       seenPhase = session.phaseIndex;
       commit({ ...app.state!, session });
-    } else if (mode === 'diagnostic') {
-      if (st.diagnostic) diag = st.diagnostic;
+    } else if (m === 'diagnostic') {
+      if (s.diagnostic) diag = s.diagnostic;
       else {
-        const out = startDiagnostic(st, now);
+        const out = startDiagnostic(s, now);
         diag = out.diagnostic;
         commit(out.state);
       }
-    } else if (mode === 'benchmark') {
-      if (st.benchmark) bench = st.benchmark;
+    } else if (m === 'benchmark') {
+      if (s.benchmark) bench = s.benchmark;
       else {
-        const out = startBenchmark(st, now);
+        const out = startBenchmark(s, now);
         bench = out.benchmark;
         commit(out.state);
       }
-    } else {
+    } else if (m === 'custom') {
       serveCustom();
     }
+  }
 
-    const onVis = () => {
-      if (document.visibilityState === 'hidden' && session && !session.paused) {
-        saveSession(pause(session));
-      }
-    };
+  onMount(() => {
+    begin();
     const timer = setInterval(() => {
       if (
         mode === 'session' &&
@@ -250,10 +306,9 @@
         commitQuiet({ ...app.state!, session: t });
       }
     }, 1000);
-    document.addEventListener('visibilitychange', onVis);
     return () => {
       clearInterval(timer);
-      document.removeEventListener('visibilitychange', onVis);
+      app.running = false;
     };
   });
 
@@ -319,15 +374,14 @@
     if (mode === 'session' && session) {
       shown = null;
       if (session.completed) {
-        commit(finishSession(app.state!, session, Date.now()));
-        go('today');
+        doneSession();
         return;
       }
       const advanced = advanceIfOver(session);
       if (advanced.completed) {
         session = advanced;
         commit({ ...app.state!, session: advanced });
-        return; // $effect shows the completion path through onNext below
+        return;
       }
       if (advanced.phaseIndex !== session.phaseIndex) {
         session = advanced;
@@ -380,42 +434,45 @@
     customQ = pick.question;
   }
 
-  function togglePause() {
-    if (!session) return;
-    saveSession(session.paused ? resume(session) : pause(session));
+  // The only way out besides natural ends: keep what is persisted and
+  // go back to where the run started. A session is marked paused so the
+  // model serves nothing while away. A run started from the Practice tab
+  // returns to the chooser, which is the same view and needs no remount.
+  function leaveRun() {
+    if (app.runOrigin === 'practice') {
+      mode = 'idle';
+      app.running = false;
+      shown = null;
+    } else {
+      go('today');
+    }
   }
 
-  function stopForNow() {
-    if (session) saveSession(pause(session));
-    go('today');
+  function stopRun() {
+    if (mode === 'session' && session && !session.completed) {
+      saveSession(pause(session));
+    }
+    leaveRun();
+  }
+
+  function doneSession() {
+    if (mode === 'session' && session) {
+      commit(finishSession(app.state!, session, Date.now()));
+    }
+    leaveRun();
   }
 
   function onCardKey(e: KeyboardEvent) {
     if (app.keysOpen) return;
-    if (
-      e.key === 'Escape' &&
-      mode === 'session' &&
-      session &&
-      !session.paused &&
-      !session.completed &&
-      interstitial === null
-    ) {
+    if (e.key === 'Escape' && mode !== 'idle') {
       e.preventDefault();
-      togglePause();
-      return;
-    }
-    if (mode === 'session' && session?.paused && e.key === 'Enter') {
-      e.preventDefault();
-      togglePause();
+      stopRun();
       return;
     }
     if (interstitial !== null) {
       if (e.key === 'Enter') {
         e.preventDefault();
         continuePhase();
-      } else if (e.key === 'Escape') {
-        e.preventDefault();
-        stopForNow();
       }
     } else if (showLesson && e.key === 'Enter') {
       e.preventDefault();
@@ -423,11 +480,16 @@
     }
   }
 
-  function endRun() {
-    if (mode === 'session' && session) {
-      commit(finishSession(app.state!, session, Date.now()));
-    }
-    go('today');
+  function startCustomFromChooser() {
+    if (!pickSkill) return;
+    const band = pickBand === 'auto' ? null : Number(pickBand);
+    startPractice('custom', [pickSkill], band, false, 'practice');
+    begin();
+  }
+
+  function resumeSessionFromChooser() {
+    startPractice('session', [], null, false, 'practice');
+    begin();
   }
 
   // Extend the harness hook from app.svelte.ts with runner helpers.
@@ -447,22 +509,48 @@
 
 <svelte:window onkeydown={onCardKey} />
 
-<span class="blocklabel">{blockLabel}</span>
+{#if mode !== 'idle'}
+  <span class="blocklabel">{blockLabel}</span>
+{/if}
 {#if corner}
   <div class="corner" class:low={cornerLow}>{corner}</div>
 {/if}
 
-{#if mode === 'session' && session}
+{#if mode === 'idle'}
+  <div class="card">
+    <h3 style="margin-top:0">Custom practice</h3>
+    {#if sessionLive}
+      <p>
+        Session in progress: {sessionDoneMin} of {st.session!.short ? 10 : 30} min done.
+        <button class="secondary" onclick={resumeSessionFromChooser}>Resume</button>
+      </p>
+    {/if}
+    <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+      <select bind:value={pickSkill} aria-label="Skill">
+        <option value="">Choose a skill</option>
+        {#each families as f}
+          <optgroup label={FAMILY_NAME[f] ?? `Family ${f}`}>
+            {#each practicableByFamily.get(f) ?? [] as s}
+              <option value={s.id}>{s.name}</option>
+            {/each}
+          </optgroup>
+        {/each}
+      </select>
+      <select bind:value={pickBand} aria-label="Band">
+        <option value="auto">Auto band</option>
+        <option value="0">Band 0</option>
+        <option value="1">Band 1</option>
+        <option value="2">Band 2</option>
+        <option value="3">Band 3</option>
+      </select>
+      <button onclick={startCustomFromChooser} disabled={!pickSkill}>Start</button>
+    </div>
+  </div>
+{:else if mode === 'session' && session}
   {#if session.completed}
     <div class="card">
       <p><strong>Session complete.</strong></p>
-      <button onclick={endRun}>Done</button>
-    </div>
-  {:else if session.paused}
-    <div class="card">
-      <p>Paused.</p>
-      <button onclick={togglePause}>Resume</button>
-      <button class="secondary" onclick={endRun}>End</button>
+      <button onclick={doneSession}>Done</button>
     </div>
   {:else if interstitial !== null && phase}
     <div class="card">
@@ -475,7 +563,7 @@
         </p>
       {/each}
       <button onclick={continuePhase}>Continue</button>
-      <button class="secondary" onclick={stopForNow}>Stop for now</button>
+      <button class="secondary" onclick={stopRun}>Stop</button>
     </div>
   {:else if showLesson && learnMethod}
     <MethodCard method={learnMethod} />
@@ -485,9 +573,9 @@
   {:else}
     <div class="card"><p class="muted">Preparing...</p></div>
   {/if}
-  {#if !session.paused && !session.completed && interstitial === null}
+  {#if !session.completed && interstitial === null}
     <p>
-      <button class="secondary" onclick={togglePause}>Pause</button>
+      <button class="secondary" onclick={stopRun}>Stop</button>
     </p>
   {/if}
 {:else if mode === 'diagnostic' && diag}
@@ -497,7 +585,7 @@
     <div class="card"><p class="muted">Finishing...</p></div>
   {/if}
   <p>
-    <button class="secondary" onclick={() => go('today')}>Pause</button>
+    <button class="secondary" onclick={stopRun}>Stop</button>
   </p>
 {:else if mode === 'benchmark' && bench}
   {#if question}
@@ -505,9 +593,12 @@
   {:else}
     <div class="card"><p class="muted">Finishing...</p></div>
   {/if}
+  <p>
+    <button class="secondary" onclick={stopRun}>Stop</button>
+  </p>
 {:else}
   {#if question}
     <Question {question} {onSubmit} {onNext} />
   {/if}
-  <p><button class="secondary" onclick={endRun}>End</button></p>
+  <p><button class="secondary" onclick={stopRun}>Stop</button></p>
 {/if}

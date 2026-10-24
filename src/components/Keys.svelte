@@ -9,7 +9,7 @@
       <tr><td>Enter</td><td>Submit, continue, start</td></tr>
       <tr><td>Space</td><td>Skip (empty box), continue (after an answer)</td></tr>
       <tr><td>r</td><td>Show or hide the route</td></tr>
-      <tr><td>Esc</td><td>Pause, or stop for now on a block card</td></tr>
+      <tr><td>Esc</td><td>Stop (progress is kept)</td></tr>
       <tr><td>Option + 1-4</td><td>Today, Practice, Knowledge, Progress</td></tr>
       <tr><td>?</td><td>This card</td></tr>
     </tbody>

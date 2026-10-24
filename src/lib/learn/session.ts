@@ -5,7 +5,7 @@
 // questions. The review phase drains the review queue (today's misses,
 // regenerated with fresh seeds) and ends early when the queue is empty.
 // Time accrues only through `tick`: the UI calls it on a timer while the
-// session is unpaused, and it counts everything, including reading a lesson
+// session is live, and it counts everything, including reading a lesson
 // or feedback, because that is session time too.
 
 import { factTemplateFor, generate, generateFact } from '../engine/registry';
