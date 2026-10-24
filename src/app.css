@@ -260,6 +260,24 @@ input[type='text'].answer {
   display: none;
 }
 
+/* Run header: block label left, timer/count right, inside the panel. */
+.runhead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin: 0 0 0.75rem;
+}
+
+.runtime {
+  font-variant-numeric: tabular-nums;
+}
+
+.runtime.low {
+  opacity: 0.55;
+}
+
 @media (prefers-color-scheme: dark) {
   :root[data-theme='system'] .bg {
     display: none;
@@ -394,64 +412,6 @@ nav a.active {
   }
 }
 
-/* Corner timer */
-.corner {
-  position: fixed;
-  top: calc(0.5rem + env(safe-area-inset-top));
-  right: 0.75rem;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
-  z-index: 20;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.15rem 0.6rem;
-  backdrop-filter: var(--glass, none);
-  -webkit-backdrop-filter: var(--glass, none);
-}
-
-:root[data-theme='dark'] .corner {
-  background: var(--card);
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-theme='system'] .corner {
-    background: var(--card);
-  }
-}
-
-.corner.low {
-  opacity: 0.55;
-}
-
-/* Top-left block label wears the same pill so the header row reads as
-   one line of chips over the decorated band. */
-.blocklabel {
-  position: fixed;
-  top: calc(0.5rem + env(safe-area-inset-top));
-  left: max(0.75rem, calc(50% - 20rem));
-  z-index: 20;
-  display: inline-block;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-  font-size: 0.9rem;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  padding: 0.15rem 0.6rem;
-  margin: 0;
-  backdrop-filter: var(--glass, none);
-  -webkit-backdrop-filter: var(--glass, none);
-}
-
-:root[data-theme='dark'] .blocklabel {
-  background: var(--card);
-}
-@media (prefers-color-scheme: dark) {
-  :root[data-theme='system'] .blocklabel {
-    background: var(--card);
-  }
-}
 
 
 /* Update pill */
@@ -683,10 +643,3 @@ ol.route li {
   }
 }
 
-/* On wide screens the nav is at the top, so the pills sit below it. */
-@media (min-width: 641px) {
-  .corner,
-  .blocklabel {
-    top: calc(var(--nav-h, 45px) + 0.5rem);
-  }
-}

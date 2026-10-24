@@ -510,10 +510,10 @@
 <svelte:window onkeydown={onCardKey} />
 
 {#if mode !== 'idle'}
-  <span class="blocklabel">{blockLabel}</span>
-{/if}
-{#if corner}
-  <div class="corner" class:low={cornerLow}>{corner}</div>
+  <div class="runhead">
+    <span class="runlabel">{blockLabel}</span>
+    <span class="runtime" class:low={cornerLow}>{corner}</span>
+  </div>
 {/if}
 
 {#if mode === 'idle'}
