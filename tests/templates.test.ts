@@ -67,7 +67,7 @@ const ORACLES: Record<string, (q: Question) => Rational | Rational[]> = {
   'square-ending-5': (q) => rat(N(q, 'n') * N(q, 'n')),
   'div-exact': (q) => rat(N(q, 'D') / N(q, 'd')),
   'div-decimal': (q) => rdiv(Rs(q, 'dividend'), Rs(q, 'divisor')),
-  'div-estimate': (q) => rat(Math.round(N(q, 'D') / roundToSig(N(q, 'd'), 2))),
+  'div-estimate': (q) => rat(N(q, 'D'), N(q, 'd')),
   'dec-mul': (q) => rmul(Rs(q, 'a'), Rs(q, 'b')),
   'dec-add-sub': (q) =>
     q.params.op === '+' ? radd(Rs(q, 'a'), Rs(q, 'b')) : rsub(Rs(q, 'a'), Rs(q, 'b')),
@@ -121,18 +121,16 @@ const ORACLES: Record<string, (q: Question) => Rational | Rational[]> = {
       ? rmul(rat(N(q, 'amount')), Rs(q, 'rate'))
       : rdiv(rat(N(q, 'amount')), Rs(q, 'rate')),
   'double-halve': (q) =>
-    q.params.op === 'double' ? rat(2 * N(q, 'n')) : rat(N(q, 'n'), 2),
+    String(q.params.op).toLowerCase() === 'double'
+      ? rat(2 * N(q, 'n'))
+      : rat(N(q, 'n'), 2),
   powers: (q) => rat(BigInt(N(q, 'base')) ** BigInt(N(q, 'exp'))),
   roots: (q) => {
     const n = N(q, 'n');
     if (q.band <= 2) return rat(Math.round(Math.sqrt(n)));
-    const lo = Math.floor(Math.sqrt(n));
-    const off = n - lo * lo;
-    const gap = 2 * lo + 1;
-    return rat(Math.round(((lo * gap + off) / gap) * 10), 10);
+    return rat(Math.round(Math.sqrt(n) * 1000), 1000);
   },
-  'estimate-product': (q) =>
-    rat(roundToSig(N(q, 'a'), 1) * roundToSig(N(q, 'b'), 1)),
+  'estimate-product': (q) => rat(N(q, 'a') * N(q, 'b')),
   signed: (q) => {
     const a = N(q, 'a');
     const b = N(q, 'b');
@@ -209,15 +207,25 @@ describe('generated questions', () => {
               `${t.id}#${seed}: oracle ${JSON.stringify(q.params)} -> ${toNumber(expected as Rational)} vs ${toNumber(q.answer.value)}`,
             ).toBe(true);
           }
-          // (2) last route step equals the answer value
+          // (2) last route step equals the answer value; for approx answers
+          // it must land inside the tolerance band instead.
           const last = q.route.at(-1);
           expect(last, `${t.id}#${seed}: empty route`).toBeDefined();
           const answerV =
             q.answer.kind === 'list' ? q.answer.values[0]! : q.answer.value;
-          expect(
-            eq(last!.value, answerV),
-            `${t.id}#${seed}: last step ${toNumber(last!.value)} != answer ${toNumber(answerV)} (${q.prompt})`,
-          ).toBe(true);
+          if (q.answer.kind === 'approx') {
+            const delta = Math.abs(toNumber(last!.value) - toNumber(answerV));
+            const tol = toNumber(q.answer.tolerance);
+            expect(
+              delta <= tol,
+              `${t.id}#${seed}: route ends at ${toNumber(last!.value)}, answer ${toNumber(answerV)} ± ${tol} (${q.prompt})`,
+            ).toBe(true);
+          } else {
+            expect(
+              eq(last!.value, answerV),
+              `${t.id}#${seed}: last step ${toNumber(last!.value)} != answer ${toNumber(answerV)} (${q.prompt})`,
+            ).toBe(true);
+          }
           // (3) each step's value appears in its text
           for (const s of q.route) {
             expect(
@@ -233,6 +241,11 @@ describe('generated questions', () => {
               `${t.id}#${seed}: param ${k}=${String(v)} not in "${q.prompt}"`,
             ).toBe(true);
           }
+          // (4b) prompt starts with a digit, a math symbol, or a capital letter
+          expect(
+            /^[0-9A-Z−√≈$]/.test(q.prompt.trimStart()),
+            `${t.id}#${seed}: prompt starts badly: "${q.prompt}"`,
+          ).toBe(true);
           // (7) canonical display round-trips through checkAnswer
           const shown = displayAnswer(q.answer);
           expect(

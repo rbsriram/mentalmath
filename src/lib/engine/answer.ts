@@ -44,6 +44,13 @@ function countSigDigits(intPart: string, fracPart: string): number {
   return digits.length;
 }
 
+// True when a digits/commas token is either plain digits or correctly
+// grouped thousands (first group 1-3 digits, then groups of exactly 3).
+function validGroups(s: string): boolean {
+  if (!s.includes(',')) return /^[+-]?\d+$/.test(s);
+  return /^[+-]?\d{1,3}(?:,\d{3})+$/.test(s);
+}
+
 // Parses one numeric token after decoration stripping.
 // Accepts integers, decimals, thousands separators, fractions, mixed numbers.
 function parseToken(t: string): ParsedValue | null {
@@ -65,12 +72,17 @@ function parseToken(t: string): ParsedValue | null {
     };
   }
 
-  const frac = /^([+-]?\d+)\/(\d+)$/.exec(t);
+  const frac = /^([+-]?[\d,]+)\/([\d,]+)$/.exec(t);
   if (frac) {
-    const d = BigInt(frac[2]!);
+    const numS = frac[1]!;
+    const denS = frac[2]!;
+    // Thousands separators are allowed inside each fraction part, validated
+    // per part (first group 1-3 digits, then groups of exactly 3).
+    if (!validGroups(numS) || !validGroups(denS)) return null;
+    const d = BigInt(denS.replace(/,/g, ''));
     if (d === 0n) return null;
     return {
-      value: rat(BigInt(frac[1]!), d),
+      value: rat(BigInt(numS.replace(/,/g, '')), d),
       decimalPlaces: null,
       sigDigits: null,
       wasFraction: true,

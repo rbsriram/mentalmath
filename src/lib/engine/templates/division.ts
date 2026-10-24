@@ -18,7 +18,7 @@ import type { Rng } from '../../math/rng';
 import type { Question, Step, Template } from '../types';
 import { D, fi, placeParts, R, roundSig, step } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
 
 // Smallest factorization of d into two factors both in [2, 12], or null.
 function factorPair(d: number): [number, number] | null {
@@ -185,8 +185,9 @@ export const divEstimate: Template = {
       step(`${fi(DR)} ÷ ${fi(dR)} = ${fi(estimate)}`, R(estimate)),
     ];
     return {
-      prompt: `Estimate ${fi(D)} ÷ ${fi(d)}`,
-      answer: { kind: 'approx', value: R(estimate), tolerance, unit: 'number' },
+      prompt: `Estimate ${fi(D)} ÷ ${fi(d)} (within 10%)`,
+      // The accepted value is the TRUE quotient; the tolerance is 10% of it.
+      answer: { kind: 'approx', value: tru, tolerance, unit: 'number' },
       params: { D, d },
       structure: 'estimated division, tolerance 10% of the true quotient',
       strategies: ['estimation-rounding'],

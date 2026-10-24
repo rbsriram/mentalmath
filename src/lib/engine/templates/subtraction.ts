@@ -9,11 +9,12 @@
 //               b2: to 1,000 (n 1-999); b3: to 10,000 (n 1,000-9,999).
 
 import { rat } from '../../math/rational';
+import { complementFactId } from '../../content/facts';
 import type { Rng } from '../../math/rng';
-import type { Question, Step, Template } from '../types';
+import type { Band, Question, Step, Template } from '../types';
 import { fi, R, step, subPartsRoute } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
 
 // All-from-9-last-from-10 route for 10^k - n. The digit taken from 10 is the
 // last NONZERO digit of n (padded to k digits); trailing zeros stay zero.
@@ -113,6 +114,26 @@ export const sub: Template = {
   },
 };
 
+function complementQuestion(base: number, n: number): Gen {
+  const result = base - n;
+  const route: Step[] =
+    base === 10
+      ? [step(`10 − ${n} = ${result}`, R(result))]
+      : complementRoute(base, n);
+  return {
+    prompt: `Complement of ${fi(n)} to ${fi(base)}`,
+    answer: { kind: 'exact', value: rat(result), unit: 'number' },
+    params: { n, base },
+    structure: `complement to ${fi(base)}`,
+    strategies: ['sub-complements'],
+    route,
+    inputMode: 'decimal',
+    // Bases 10/100/1000 are tracked fact families; base 10,000 is not.
+    factId:
+      base <= 1000 ? complementFactId(base as 10 | 100 | 1000, n) : undefined,
+  };
+}
+
 export const complement: Template = {
   id: 'complement',
   skill: 'complements-100',
@@ -121,21 +142,16 @@ export const complement: Template = {
   generate(rng: Rng, band): Gen {
     const base = [10, 100, 1000, 10000][band]!;
     const lo = band === 3 ? 1000 : 1;
-    const n = rng.int(lo, base - 1);
-    const result = base - n;
-    const route: Step[] =
-      base === 10
-        ? [step(`10 − ${n} = ${result}`, R(result))]
-        : complementRoute(base, n);
-    return {
-      prompt: `Complement of ${fi(n)} to ${fi(base)}`,
-      answer: { kind: 'exact', value: rat(result), unit: 'number' },
-      params: { n, base },
-      structure: `complement to ${fi(base)}`,
-      strategies: ['sub-complements'],
-      route,
-      inputMode: 'decimal',
-    };
+    return complementQuestion(base, rng.int(lo, base - 1));
+  },
+  forFact(factId: string, _rng: Rng): Gen {
+    const m = /^c(10|100|1000):(\d+)$/.exec(factId);
+    if (!m) throw new Error(`complement: bad fact id "${factId}"`);
+    return complementQuestion(Number(m[1]), Number(m[2]));
+  },
+  factBand(factId: string): Band {
+    const base = Number(factId.slice(1).split(':')[0]);
+    return base <= 10 ? 0 : base <= 100 ? 1 : base <= 1000 ? 2 : 3;
   },
 };
 

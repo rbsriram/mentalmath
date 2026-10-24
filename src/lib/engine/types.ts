@@ -19,6 +19,10 @@ export interface Question {
   templateId: string;
   seed: number;
   band: Band;
+  // Copied from the template by the registry so the question carries its own
+  // provenance for the learning model and the attempt log.
+  skill: string;
+  skills: string[];
   prompt: string;
   context?: string;
   answer: Answer;
@@ -27,6 +31,9 @@ export interface Question {
   strategies: string[];
   route: Step[];
   inputMode: 'decimal' | 'text';
+  // Set on fact-family questions (tables, squares, complements, fraction
+  // equivalents, percent anchors) so the learning model can track the fact.
+  factId?: string | undefined;
 }
 
 export interface Template {
@@ -34,5 +41,9 @@ export interface Template {
   skill: string;
   skills?: string[];
   smallSpace?: boolean;
-  generate(rng: Rng, band: Band): Omit<Question, 'templateId' | 'seed' | 'band'>;
+  generate(rng: Rng, band: Band): Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
+  // Fact-family templates only: produce the question for one exact fact.
+  forFact?(factId: string, rng: Rng): Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
+  // Fact-family templates only: the band this fact belongs to.
+  factBand?(factId: string): Band;
 }

@@ -21,11 +21,12 @@ import {
   type Rational,
 } from '../../math/rational';
 import { formatNumber } from '../../math/format';
+import { percentAnchorFactId } from '../../content/facts';
 import type { Rng } from '../../math/rng';
-import type { Question, Step, Template } from '../types';
+import type { Band, Question, Step, Template } from '../types';
 import { D, fi, fmoney, R, splitPercent, step } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
 
 const ANCHORS = [5, 10, 20, 25, 50, 75] as const;
 
@@ -100,6 +101,20 @@ function radd2(a: Rational, b: Rational): Rational {
   return rat(a.n * b.d + b.n * a.d, a.d * b.d);
 }
 
+function anchorQuestion(p: number, N: number): Gen {
+  const value = rmul(R(N), rat(p, 100));
+  return {
+    prompt: `${p}% of ${fi(N)}`,
+    answer: { kind: 'exact', value, unit: 'number' },
+    params: { p, n: N },
+    structure: `anchor percent ${p}% of a round number`,
+    strategies: ['pct-anchors'],
+    route: anchorSteps(p, R(N)),
+    inputMode: 'decimal',
+    factId: percentAnchorFactId(p),
+  };
+}
+
 export const pctAnchor: Template = {
   id: 'pct-anchor',
   skill: 'percent-anchors',
@@ -110,16 +125,18 @@ export const pctAnchor: Template = {
     const unit = band <= 1 ? 20 : 40;
     const nHi = band === 0 ? 200 : band === 1 ? 1000 : band === 2 ? 5000 : 20000;
     const N = unit * rng.int(2, nHi / unit);
-    const value = rmul(R(N), rat(p, 100));
-    return {
-      prompt: `${p}% of ${fi(N)}`,
-      answer: { kind: 'exact', value, unit: 'number' },
-      params: { p, n: N },
-      structure: `anchor percent ${p}% of a round number`,
-      strategies: ['pct-anchors'],
-      route: anchorSteps(p, R(N)),
-      inputMode: 'decimal',
-    };
+    return anchorQuestion(p, N);
+  },
+  forFact(factId: string, rng: Rng): Gen {
+    const m = /^pa:(\d+)$/.exec(factId);
+    if (!m || !(ANCHORS as readonly number[]).includes(Number(m[1]))) {
+      throw new Error(`pct-anchor: bad fact id "${factId}"`);
+    }
+    return anchorQuestion(Number(m[1]), 20 * rng.int(2, 50));
+  },
+  factBand(factId: string): Band {
+    const p = Number(factId.slice(3));
+    return p === 10 || p === 50 ? 0 : 1;
   },
 };
 
@@ -173,38 +190,32 @@ export const pctReverse: Template = {
   },
 };
 
-const DISCOUNT_PCTS = [5, 10, 15, 20, 25, 30, 40, 50];
-const DISCOUNT_ITEMS = [
-  'jacket',
-  'phone',
-  'backpack',
-  'ticket',
-  'chair',
-  'meal set',
-  'headphones',
-  'watch',
-];
-
 export const pctDiscount: Template = {
   id: 'pct-discount',
   skill: 'pct-discount',
   skills: ['pct-of'],
   generate(rng: Rng, band): Gen {
-    const item = rng.pick(DISCOUNT_ITEMS);
-    const centHi = band === 0 ? 5000 : band === 1 ? 50000 : band === 2 ? 499975 : 999975;
+    // p sets by band; price in cents, a multiple of 25 through band 2,
+    // any cents at band 3; bands 0-1 stay under AED 500.
+    const pSet = band <= 1 ? [10, 20, 25, 50] : [15, 20, 25, 30, 35, 40, 45, 60, 70];
+    const centHi =
+      band === 0 ? 25000 : band === 1 ? 49975 : band === 2 ? 499975 : 999975;
+    const stepCents = band === 3 ? 1 : 25;
     let p = 10;
     let cents = 1000;
     // Resample until the kept price has at most 2 decimals
     // (cents x (100 - p) must be a multiple of 100).
     for (let t = 0; t < 500; t++) {
-      p = rng.pick(DISCOUNT_PCTS);
-      cents = rng.int(1000, centHi);
+      p = rng.pick(pSet);
+      cents =
+        stepCents * rng.int(Math.ceil(1000 / stepCents), Math.floor(centHi / stepCents));
       if ((cents * (100 - p)) % 100 === 0) break;
     }
     if ((cents * (100 - p)) % 100 !== 0) {
-      // Fallback: 25% off a multiple-of-4 price always stays in cents.
-      p = 25;
-      cents = Math.ceil(cents / 4) * 4;
+      // Fallback: 50% off a multiple-of-100 price always stays in cents
+      // and keeps the band's quarter-multiple rule.
+      p = 50;
+      cents = Math.ceil(cents / 100) * 100;
     }
     const price = rat(cents, 100);
     const keptFinal = rmul(price, rat(100 - p, 100));
@@ -214,7 +225,6 @@ export const pctDiscount: Template = {
     ];
     return {
       prompt: `${p}% off ${fmoney(price)}. What is the new price?`,
-      context: `A ${item} goes on sale.`,
       answer: { kind: 'exact', value: keptFinal, unit: 'currency', currency: 'AED' },
       params: { p, price: fmoney(price).slice(4) },
       structure: `${p}% discount on a 2-decimal price`,

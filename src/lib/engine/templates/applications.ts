@@ -18,7 +18,7 @@ import type { Rng } from '../../math/rng';
 import type { Question, Step, Template } from '../types';
 import { fi, fmoney, R, step } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
 
 export const ratioSplit: Template = {
   id: 'ratio-split',
@@ -109,16 +109,22 @@ export const unitPrice: Template = {
   generate(rng: Rng, band): Gen {
     const uHi = band === 0 ? 500 : band === 1 ? 1500 : 2500; // cents
     const qHi = band === 0 ? 8 : band === 1 ? 16 : 24;
+    // Bands 0-1: unit prices are whole or .50 amounts (50-cent steps).
+    const cStep = band <= 1 ? 50 : 1;
+    const cLo = band <= 1 ? 100 : 20;
     let uc1 = 0;
     let uc2 = 0;
     let q1 = 0;
     let q2 = 0;
+    // Resample until the two unit prices differ but sit within 25%.
     for (let t = 0; t < 500; t++) {
-      uc1 = rng.int(20, uHi);
-      uc2 = rng.int(20, uHi);
+      uc1 = cStep * rng.int(Math.ceil(cLo / cStep), Math.floor(uHi / cStep));
+      uc2 = cStep * rng.int(Math.ceil(cLo / cStep), Math.floor(uHi / cStep));
       q1 = rng.int(2, qHi);
       q2 = rng.int(2, qHi);
-      if (uc1 !== uc2) break; // a tie has no cheaper pack
+      const lo = Math.min(uc1, uc2);
+      const hi = Math.max(uc1, uc2);
+      if (uc1 !== uc2 && lo * 4 >= hi * 3) break;
     }
     const t1 = uc1 * q1;
     const t2 = uc2 * q2;
@@ -135,7 +141,6 @@ export const unitPrice: Template = {
     ];
     return {
       prompt: `Pack A: ${q1} units for ${fmoney(rat(t1, 100))}. Pack B: ${q2} units for ${fmoney(rat(t2, 100))}. Give the unit price of the cheaper pack`,
-      context: 'Two packs of the same product.',
       answer: { kind: 'exact', value: cheaper, unit: 'currency', currency: 'AED' },
       params: { q1, total1: formatNumber(rat(t1, 100)), q2, total2: formatNumber(rat(t2, 100)) },
       structure: 'unit price comparison of two packs',
@@ -146,8 +151,21 @@ export const unitPrice: Template = {
   },
 };
 
-const MARGIN_SET = [10, 20, 25, 40, 50];
-const MARKUP_SET = [10, 20, 25, 50, 75, 100];
+const MARGIN_PCTS = [5, 10, 12.5, 20, 25, 30, 40, 50];
+
+// Denominator of p/100 in lowest terms (12.5 -> 8, 30 -> 10).
+function pctDenom(p: number): number {
+  const num = Math.round(p * 10); // tenths of a percent
+  const den = 1000;
+  let a = num;
+  let b = den;
+  while (b !== 0) {
+    const t = a % b;
+    a = b;
+    b = t;
+  }
+  return den / a;
+}
 
 export const marginMarkup: Template = {
   id: 'margin-markup',
@@ -155,26 +173,29 @@ export const marginMarkup: Template = {
   smallSpace: true,
   generate(rng: Rng, band): Gen {
     const askMargin = rng.chance(0.5);
-    let cost = 60;
-    let price = 80;
-    let pct = 25;
-    if (askMargin) {
-      // margin m: cost = price x (100 - m)/100 must be a whole number.
-      for (let t = 0; t < 500; t++) {
-        pct = rng.pick(MARGIN_SET);
-        const pHi = band === 0 ? 200 : band === 1 ? 1000 : 5000;
-        price = rng.int(2, pHi) * (100 / gcd100(100 - pct));
-        cost = (price * (100 - pct)) / 100;
-        if (Number.isInteger(cost) && cost > 0 && cost !== price) break;
+    const cap = band <= 1 ? 200 : band === 2 ? 1000 : 10000;
+    let cost = 0;
+    let price = 0;
+    let pct = 0;
+    // Build from the asked percent so the answer is exact: profit = pct/100
+    // of the relevant base, so the base must be a multiple of pct's
+    // denominator.
+    for (let t = 0; t < 500; t++) {
+      pct = rng.pick(MARGIN_PCTS);
+      const den = pctDenom(pct);
+      const kLo = Math.ceil(20 / den);
+      const kHi = Math.floor(cap / den);
+      const base = den * rng.int(kLo, kHi);
+      const profit = (pct * base) / 100;
+      if (!Number.isInteger(profit)) continue;
+      if (askMargin) {
+        price = base;
+        cost = price - profit;
+      } else {
+        cost = base;
+        price = cost + profit;
       }
-    } else {
-      for (let t = 0; t < 500; t++) {
-        pct = rng.pick(MARKUP_SET);
-        const cHi = band === 0 ? 200 : band === 1 ? 1000 : 5000;
-        cost = rng.int(2, cHi) * (100 / gcd100(pct));
-        price = (cost * (100 + pct)) / 100;
-        if (Number.isInteger(price) && price !== cost) break;
-      }
+      if (cost > 0 && cost !== price) break;
     }
     const profit = price - cost;
     const base = askMargin ? price : cost;
@@ -189,8 +210,7 @@ export const marginMarkup: Template = {
       step(`${formatNumber(frac)} × 100 = ${formatNumber(pctVal)}%`, pctVal),
     ];
     return {
-      prompt: `Cost ${fi(cost)}, price ${fi(price)}. What is the ${askMargin ? 'margin' : 'markup'} percent?`,
-      context: 'Margin is profit over price; markup is profit over cost.',
+      prompt: `Cost ${fi(cost)}, price ${fi(price)}. What is the ${askMargin ? 'margin percent (profit over price)' : 'markup percent (profit over cost)'}?`,
       answer: { kind: 'exact', value: pctVal, unit: 'percent' },
       params: { cost, price, ask: askMargin ? 'margin' : 'markup' },
       structure: `${askMargin ? 'margin' : 'markup'} percent`,
@@ -200,17 +220,6 @@ export const marginMarkup: Template = {
     };
   },
 };
-
-function gcd100(x: number): number {
-  let a = 100;
-  let b = x;
-  while (b !== 0) {
-    const t = a % b;
-    a = b;
-    b = t;
-  }
-  return a;
-}
 
 export const simpleInterest: Template = {
   id: 'simple-interest',
@@ -229,7 +238,6 @@ export const simpleInterest: Template = {
     ];
     return {
       prompt: `Simple interest: ${fmoney(rat(principal))} at ${rate}% per year for ${years} years. How much interest?`,
-      context: 'Simple interest adds the same amount each year.',
       answer: { kind: 'exact', value: rat(interest), unit: 'currency', currency: 'AED' },
       params: { principal, rate, years },
       structure: 'simple interest P x r% x t',
@@ -262,7 +270,6 @@ export const taxInclusive: Template = {
     ];
     return {
       prompt: `A bill of ${fmoney(grossR)} includes ${rate}% tax. What was the amount before tax?`,
-      context: 'The tax is part of the shown total.',
       answer: { kind: 'exact', value: rat(net), unit: 'currency', currency: 'AED' },
       params: { gross: fmoney(grossR).slice(4), rate },
       structure: `remove ${rate}% tax from the gross`,
@@ -303,7 +310,6 @@ export const currencyConvert: Template = {
     }
     return {
       prompt,
-      context: 'The rate is a fictional round number.',
       answer: { kind: 'exact', value: answer, unit: 'number' },
       params: { amount: shownAmount, rate, from: toCredits ? 'AED' : 'credits' },
       structure: `currency conversion at rate ${rate}`,

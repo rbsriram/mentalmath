@@ -42,5 +42,43 @@ export function generate(templateId: string, seed: number, band: Band): Question
   const t = BY_ID.get(templateId);
   if (!t) throw new Error(`registry: unknown template "${templateId}"`);
   const q = t.generate(createRng(seed), band);
-  return { ...q, templateId, seed, band };
+  return { ...q, templateId, seed, band, skill: t.skill, skills: t.skills ?? [] };
+}
+
+// Fact family -> template that produces it.
+const FACT_TEMPLATES: Record<string, string> = {
+  tables: 'mul-table-fact',
+  squares: 'square-fact',
+  'complements-10': 'complement',
+  'complements-100': 'complement',
+  'complements-1000': 'complement',
+  'fraction-equivalents': 'frac-to-dec-pct',
+  'percent-anchors': 'pct-anchor',
+};
+
+export function factTemplateFor(family: string): string {
+  const id = FACT_TEMPLATES[family];
+  if (!id) throw new Error(`registry: unknown fact family "${family}"`);
+  return id;
+}
+
+// Generate the question for one exact fact; the band is the fact's own.
+export function generateFact(
+  templateId: string,
+  factId: string,
+  seed: number,
+): Question {
+  const t = BY_ID.get(templateId);
+  if (!t?.forFact || !t.factBand) {
+    throw new Error(`registry: "${templateId}" is not a fact template`);
+  }
+  const q = t.forFact(factId, createRng(seed));
+  return {
+    ...q,
+    templateId,
+    seed,
+    band: t.factBand(factId),
+    skill: t.skill,
+    skills: t.skills ?? [],
+  };
 }

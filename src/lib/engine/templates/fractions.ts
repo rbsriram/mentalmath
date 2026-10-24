@@ -18,12 +18,12 @@ import {
   toDisplay,
   type Rational,
 } from '../../math/rational';
-import { FRACTION_EQUIVALENTS } from '../../content/facts';
+import { FRACTION_EQUIVALENTS, fractionFactId } from '../../content/facts';
 import type { Rng } from '../../math/rng';
-import type { Question, Step, Template } from '../types';
+import type { Band, Question, Step, Template } from '../types';
 import { fi, longDivision, R, step } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
 
 const EASY_DENOMS = [2, 4, 5, 10];
 const MID_DENOMS = [2, 3, 4, 5, 6, 8, 9, 10, 12, 16];
@@ -85,6 +85,25 @@ function conversionRoute(n: number, d: number, ask: 'decimal' | 'percent'): Step
   return steps;
 }
 
+function convQuestion(n: number, d: number, rng: Rng): Gen {
+  const ask: 'decimal' | 'percent' = rng.chance(0.5) ? 'decimal' : 'percent';
+  const value = ask === 'percent' ? rat(100 * n, d) : rat(n, d);
+  return {
+    prompt: `Write ${n}/${d} as ${ask === 'percent' ? 'a percent' : 'a decimal'}`,
+    answer: {
+      kind: 'exact',
+      value,
+      unit: ask === 'percent' ? 'percent' : 'number',
+    },
+    params: { n, d, ask },
+    structure: `fraction to ${ask}`,
+    strategies: ['frac-to-dec-pct'],
+    route: conversionRoute(n, d, ask),
+    inputMode: 'text',
+    factId: fractionFactId(n, d),
+  };
+}
+
 export const fracToDecPct: Template = {
   id: 'frac-to-dec-pct',
   skill: 'frac-to-dec-pct',
@@ -94,21 +113,16 @@ export const fracToDecPct: Template = {
     const maxDenom = band === 0 ? 10 : band === 1 ? 20 : 50;
     const pool = FRACTION_EQUIVALENTS.filter(([, d]) => d <= maxDenom);
     const [n, d] = rng.pick(pool);
-    const ask: 'decimal' | 'percent' = rng.chance(0.5) ? 'decimal' : 'percent';
-    const value = ask === 'percent' ? rat(100 * n, d) : rat(n, d);
-    return {
-      prompt: `Write ${n}/${d} as ${ask === 'percent' ? 'a percent' : 'a decimal'}`,
-      answer: {
-        kind: 'exact',
-        value,
-        unit: ask === 'percent' ? 'percent' : 'number',
-      },
-      params: { n, d, ask },
-      structure: `fraction to ${ask}`,
-      strategies: ['frac-to-dec-pct'],
-      route: conversionRoute(n, d, ask),
-      inputMode: 'text',
-    };
+    return convQuestion(n, d, rng);
+  },
+  forFact(factId: string, rng: Rng): Gen {
+    const m = /^fe:(\d+)\/(\d+)$/.exec(factId);
+    if (!m) throw new Error(`frac-to-dec-pct: bad fact id "${factId}"`);
+    return convQuestion(Number(m[1]), Number(m[2]), rng);
+  },
+  factBand(factId: string): Band {
+    const d = Number(factId.split('/')[1]);
+    return d <= 10 ? 0 : d <= 20 ? 1 : 2;
   },
 };
 

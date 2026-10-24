@@ -16,7 +16,7 @@ import type { Rng } from '../../math/rng';
 import type { Question, Template } from '../types';
 import { addPartsRoute, chainAddRoute, fi, R, step } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
 
 export const addTwo: Template = {
   id: 'add-two',

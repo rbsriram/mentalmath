@@ -23,7 +23,7 @@ import type { Rng } from '../../math/rng';
 import type { Question, Step, Template } from '../types';
 import { D, decimalParts, fi, R, step } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
 
 // A random decimal string in (0, intHi), with up to `places` decimal places
 // and no trailing zeros.

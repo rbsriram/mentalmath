@@ -4,6 +4,7 @@
 export const FACT_FAMILIES = [
   'tables',
   'squares',
+  'complements-10',
   'complements-100',
   'complements-1000',
   'fraction-equivalents',
@@ -23,7 +24,7 @@ export function squareFactId(n: number): string {
   return `sq:${n}`;
 }
 
-export function complementFactId(base: 100 | 1000, n: number): string {
+export function complementFactId(base: 10 | 100 | 1000, n: number): string {
   return `c${base}:${n}`;
 }
 
@@ -83,6 +84,11 @@ export function listFacts(family: FactFamily): string[] {
       for (let n = 1; n <= 30; n++) out.push(squareFactId(n));
       return out;
     }
+    case 'complements-10': {
+      const out: string[] = [];
+      for (let n = 1; n <= 9; n++) out.push(complementFactId(10, n));
+      return out;
+    }
     case 'complements-100': {
       const out: string[] = [];
       for (let n = 1; n <= 99; n++) out.push(complementFactId(100, n));
@@ -98,4 +104,48 @@ export function listFacts(family: FactFamily): string[] {
     case 'percent-anchors':
       return PERCENT_ANCHORS.map((p) => percentAnchorFactId(p));
   }
+}
+
+// The fact family a fact id belongs to, or null for a malformed id.
+export function factFamilyOf(factId: string): FactFamily | null {
+  const m = /^(t|sq|c10|c100|c1000|fe|pa):(.+)$/.exec(factId);
+  if (!m) return null;
+  switch (m[1]) {
+    case 't':
+      return /^1?[0-9]x1?[0-9]$/.test(m[2]!) ? 'tables' : null;
+    case 'sq':
+      return /^\d+$/.test(m[2]!) ? 'squares' : null;
+    case 'c10':
+      return 'complements-10';
+    case 'c100':
+      return 'complements-100';
+    case 'c1000':
+      return 'complements-1000';
+    case 'fe':
+      return /^\d+\/\d+$/.test(m[2]!) ? 'fraction-equivalents' : null;
+    case 'pa':
+      return /^\d+$/.test(m[2]!) ? 'percent-anchors' : null;
+    default:
+      return null;
+  }
+}
+
+// The skill a fact belongs to, used for speed targets and family progress.
+export function familySkillForFact(factId: string): string | null {
+  const family = factFamilyOf(factId);
+  if (family === null) return null;
+  if (family === 'tables') {
+    const m = /^t:(\d+)x(\d+)$/.exec(factId);
+    if (!m) return null;
+    return Math.max(Number(m[1]), Number(m[2])) <= 10 ? 'tables-1-10' : 'tables-11-15';
+  }
+  if (family === 'squares') {
+    const n = Number(factId.slice(3));
+    return n <= 25 ? 'squares-1-25' : 'squares-26-50';
+  }
+  if (family === 'complements-10') return 'complements-10';
+  if (family === 'complements-100') return 'complements-100';
+  if (family === 'complements-1000') return 'complements-1000';
+  if (family === 'fraction-equivalents') return 'fraction-equivalents';
+  return 'percent-anchors';
 }

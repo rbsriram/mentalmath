@@ -29,7 +29,7 @@ import type { Rng } from '../../math/rng';
 import type { Question, Step, Template } from '../types';
 import { fi, placeParts, R, roundSig, step } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
 
 export const doubleHalve: Template = {
   id: 'double-halve',
@@ -51,9 +51,9 @@ export const doubleHalve: Template = {
         route.push(step(`${halves.map(fi).join(' + ')} = ${fi(total)}`, R(total)));
       }
       return {
-        prompt: `double ${fi(n)}`,
+        prompt: `Double ${fi(n)}`,
         answer: { kind: 'exact', value: R(total), unit: 'number' },
-        params: { n, op: 'double' },
+        params: { n, op: 'Double' },
         structure: 'double by place-value split',
         strategies: ['place-value-split'],
         route,
@@ -71,9 +71,9 @@ export const doubleHalve: Template = {
         route.push(step(`${halves.map(fi).join(' + ')} = ${fi(total)}`, R(total)));
       }
       return {
-        prompt: `halve ${fi(n)}`,
+        prompt: `Halve ${fi(n)}`,
         answer: { kind: 'exact', value: R(total), unit: 'number' },
-        params: { n, op: 'halve' },
+        params: { n, op: 'Halve' },
         structure: 'halve by place-value split',
         strategies: ['place-value-split'],
         route,
@@ -89,9 +89,9 @@ export const doubleHalve: Template = {
     route.push(step(`1 ÷ 2 = 0.5`, rat(1, 2)));
     route.push(step(`${fi(h)} + 0.5 = ${formatNumber(result)}`, result));
     return {
-      prompt: `halve ${fi(n)}`,
+      prompt: `Halve ${fi(n)}`,
       answer: { kind: 'exact', value: result, unit: 'number' },
-      params: { n, op: 'halve' },
+      params: { n, op: 'Halve' },
       structure: 'halve an odd number',
       strategies: ['place-value-split'],
       route,
@@ -210,6 +210,9 @@ export const roots: Template = {
     const gap = hiSq - loSq;
     const off = n - loSq;
     const estRounded = rat(Math.round(((lo * gap + off) / gap) * 10), 10);
+    // The accepted value is the true root rounded to 3 decimals (error < 5e-4,
+    // negligible next to the 0.1 tolerance).
+    const trueRoot = rat(Math.round(Math.sqrt(n) * 1000), 1000);
     const route: Step[] = [
       step(`${lo}² = ${fi(loSq)} and ${lo + 1}² = ${fi(hiSq)}`, R(loSq)),
       step(`${fi(n)} − ${fi(loSq)} = ${fi(off)}; the gap is ${fi(gap)}`, R(off)),
@@ -219,7 +222,7 @@ export const roots: Template = {
       prompt: `Estimate √${fi(n)} to within 0.1`,
       answer: {
         kind: 'approx',
-        value: estRounded,
+        value: trueRoot,
         tolerance: rat(1, 10),
         unit: 'number',
       },
@@ -258,10 +261,11 @@ export const estimateProduct: Template = {
       step(`${fi(aR)} × ${fi(bR)} = ${fi(estimate)}`, R(estimate)),
     ];
     return {
-      prompt: `Estimate ${fi(a)} × ${fi(b)}`,
+      prompt: `Estimate ${fi(a)} × ${fi(b)} (within 5%)`,
       answer: {
         kind: 'approx',
-        value: R(estimate),
+        // The accepted value is the TRUE product; the tolerance is 5% of it.
+        value: rat(tru),
         tolerance: rat(tru, 20),
         unit: 'number',
       },
@@ -480,6 +484,16 @@ export const mixedChain: Template = {
         ops.push(op);
       }
       if (ok && ops.length === count && isInteger(v)) break;
+    }
+    // Fallback: if the resample exhausted, build a guaranteed-valid chain.
+    // double -> add -> multiply keeps every intermediate a whole number.
+    if (ops.length !== count) {
+      start = rng.int(5, 60);
+      ops = [
+        { kind: 'double', frag: 'double' },
+        { kind: 'add', k: rng.int(2, 49), frag: 'add' },
+      ];
+      if (count === 3) ops.push({ kind: 'mul', k: 2, frag: 'multiply' });
     }
     let v = R(start);
     const route: Step[] = [];

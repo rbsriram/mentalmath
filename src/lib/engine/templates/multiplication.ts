@@ -23,11 +23,45 @@
 //   mul-by-11:         n: b0-1 12-99, b2 102-999, b3 1,002-9,999.
 
 import { rat } from '../../math/rational';
+import { tableFactId } from '../../content/facts';
 import type { Rng } from '../../math/rng';
-import type { Question, Step, Template } from '../types';
+import type { Band, Question, Step, Template } from '../types';
 import { fi, MINUS, mulSplitRoute, R, step } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
+
+// a x b table fact; the prompt order is randomized.
+function tableFactQuestion(a: number, b: number, rng: Rng, hi: number): Gen {
+  const product = a * b;
+  const big = Math.max(a, b);
+  const small = Math.min(a, b);
+  const [x, y] = rng.chance(0.5) ? [b, a] : [a, b];
+  let route: Step[];
+  if (big <= 10) {
+    route = [step(`${fi(small)} × ${fi(big)} = ${fi(product)}`, R(product))];
+  } else {
+    // Split the larger factor: big = 10 + rest.
+    const rest = big - 10;
+    const p1 = small * 10;
+    const p2 = small * rest;
+    route = [
+      step(`${fi(big)} = 10 + ${rest}`, R(big)),
+      step(`${fi(small)} × 10 = ${fi(p1)}`, R(p1)),
+      step(`${fi(small)} × ${rest} = ${fi(p2)}`, R(p2)),
+      step(`${fi(p1)} + ${fi(p2)} = ${fi(product)}`, R(product)),
+    ];
+  }
+  return {
+    prompt: `${fi(x)} × ${fi(y)}`,
+    answer: { kind: 'exact', value: rat(product), unit: 'number' },
+    params: { a: x, b: y },
+    structure: `table fact up to ${hi} x ${hi}`,
+    strategies: ['mul-distributive-split'],
+    route,
+    inputMode: 'decimal',
+    factId: tableFactId(a, b),
+  };
+}
 
 export const mulTableFact: Template = {
   id: 'mul-table-fact',
@@ -36,35 +70,18 @@ export const mulTableFact: Template = {
   smallSpace: true,
   generate(rng: Rng, band): Gen {
     const hi = band === 0 ? 10 : 15;
-    const a = rng.int(1, hi);
-    const b = rng.int(1, hi);
-    const product = a * b;
-    const big = Math.max(a, b);
-    const small = Math.min(a, b);
-    let route: Step[];
-    if (big <= 10 || big - 10 === 0) {
-      route = [step(`${fi(small)} × ${fi(big)} = ${fi(product)}`, R(product))];
-    } else {
-      // Split the larger factor: big = 10 + rest.
-      const rest = big - 10;
-      const p1 = small * 10;
-      const p2 = small * rest;
-      route = [
-        step(`${fi(big)} = 10 + ${rest}`, R(big)),
-        step(`${fi(small)} × 10 = ${fi(p1)}`, R(p1)),
-        step(`${fi(small)} × ${rest} = ${fi(p2)}`, R(p2)),
-        step(`${fi(p1)} + ${fi(p2)} = ${fi(product)}`, R(product)),
-      ];
-    }
-    return {
-      prompt: `${fi(a)} × ${fi(b)}`,
-      answer: { kind: 'exact', value: rat(product), unit: 'number' },
-      params: { a, b },
-      structure: `table fact up to ${hi} x ${hi}`,
-      strategies: ['mul-distributive-split'],
-      route,
-      inputMode: 'decimal',
-    };
+    return tableFactQuestion(rng.int(1, hi), rng.int(1, hi), rng, hi);
+  },
+  forFact(factId: string, rng: Rng): Gen {
+    const m = /^t:(\d+)x(\d+)$/.exec(factId);
+    if (!m) throw new Error(`mul-table-fact: bad fact id "${factId}"`);
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    return tableFactQuestion(a, b, rng, Math.max(10, a, b));
+  },
+  factBand(factId: string): Band {
+    const hi = Math.max(...factId.slice(2).split('x').map(Number));
+    return hi <= 6 ? 0 : hi <= 10 ? 1 : hi <= 13 ? 2 : 3;
   },
 };
 

@@ -10,7 +10,15 @@ import {
   squareFactId,
   tableFactId,
 } from '../src/lib/content/facts';
-import { generate, TEMPLATES } from '../src/lib/engine/registry';
+import {
+  factTemplateFor,
+  generate,
+  generateFact,
+  TEMPLATES,
+} from '../src/lib/engine/registry';
+import { checkAnswer } from '../src/lib/engine/answer';
+import { displayAnswer } from '../src/lib/math/format';
+import { eq, rat } from '../src/lib/math/rational';
 import { seedFor } from '../src/lib/math/rng';
 import type { Band } from '../src/lib/engine/types';
 
@@ -141,6 +149,52 @@ describe('template/skill wiring', () => {
             ).toBe(true);
           }
         }
+      }
+    }
+  });
+});
+
+describe('fact generation', () => {
+  it('generateFact reproduces every fact with a correct answer', () => {
+    for (const family of FACT_FAMILIES) {
+      const templateId = factTemplateFor(family);
+      for (const factId of listFacts(family)) {
+        const q = generateFact(templateId, factId, 11);
+        expect(q.factId, `${templateId}(${factId}) factId`).toBe(factId);
+        const shown = displayAnswer(q.answer);
+        expect(
+          checkAnswer(q.answer, shown).correct,
+          `${templateId}(${factId}): "${q.prompt}" -> "${shown}"`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('generateFact answers match an independent oracle', () => {
+    for (const family of FACT_FAMILIES) {
+      const templateId = factTemplateFor(family);
+      for (const factId of listFacts(family)) {
+        const q = generateFact(templateId, factId, 13);
+        if (q.answer.kind !== 'exact') throw new Error(`${factId}: not exact`);
+        let expected: ReturnType<typeof rat>;
+        if (family === 'tables') {
+          const m = /^t:(\d+)x(\d+)$/.exec(factId)!;
+          expected = rat(Number(m[1]) * Number(m[2]));
+        } else if (family === 'squares') {
+          expected = rat(Number(factId.slice(3)) ** 2);
+        } else if (family.startsWith('complements')) {
+          const m = /^c(\d+):(\d+)$/.exec(factId)!;
+          expected = rat(Number(m[1]) - Number(m[2]));
+        } else if (family === 'fraction-equivalents') {
+          const m = /^fe:(\d+)\/(\d+)$/.exec(factId)!;
+          const n = Number(m[1]);
+          const d = Number(m[2]);
+          expected = q.params.ask === 'percent' ? rat(100 * n, d) : rat(n, d);
+        } else {
+          const p = Number(factId.slice(3));
+          expected = rat(Number(q.params.n) * p, 100);
+        }
+        expect(eq(q.answer.value, expected), `${factId}: ${q.prompt}`).toBe(true);
       }
     }
   });

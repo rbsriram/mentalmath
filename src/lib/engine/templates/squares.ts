@@ -6,11 +6,12 @@
 //                     b3: 15-295 step 10.
 
 import { rat } from '../../math/rational';
+import { squareFactId } from '../../content/facts';
 import type { Rng } from '../../math/rng';
-import type { Question, Step, Template } from '../types';
+import type { Band, Question, Step, Template } from '../types';
 import { fi, R, step } from './common';
 
-type Gen = Omit<Question, 'templateId' | 'seed' | 'band'>;
+type Gen = Omit<Question, 'templateId' | 'seed' | 'band' | 'skill' | 'skills'>;
 
 function ending5Route(n: number): Step[] {
   const t = Math.floor(n / 10); // the part before the 5
@@ -54,26 +55,39 @@ function generalSquareRoute(n: number): Step[] {
   ];
 }
 
+function squareFactQuestion(n: number): Gen {
+  const sq = n * n;
+  const route =
+    n % 10 === 5 && n >= 15
+      ? ending5Route(n)
+      : [step(`${fi(n)}² = ${fi(sq)}`, R(sq))];
+  return {
+    prompt: `${fi(n)}²`,
+    answer: { kind: 'exact', value: rat(sq), unit: 'number' },
+    params: { n },
+    structure: 'recall square 1-25',
+    strategies: n % 10 === 5 && n >= 15 ? ['square-ending-5'] : [],
+    route,
+    inputMode: 'decimal',
+    factId: squareFactId(n),
+  };
+}
+
 export const squareFact: Template = {
   id: 'square-fact',
   skill: 'squares-1-25',
   smallSpace: true,
   generate(rng: Rng, _band): Gen {
-    const n = rng.int(1, 25);
-    const sq = n * n;
-    const route =
-      n % 10 === 5 && n >= 15
-        ? ending5Route(n)
-        : [step(`${fi(n)}² = ${fi(sq)}`, R(sq))];
-    return {
-      prompt: `${fi(n)}²`,
-      answer: { kind: 'exact', value: rat(sq), unit: 'number' },
-      params: { n },
-      structure: 'recall square 1-25',
-      strategies: n % 10 === 5 && n >= 15 ? ['square-ending-5'] : [],
-      route,
-      inputMode: 'decimal',
-    };
+    return squareFactQuestion(rng.int(1, 25));
+  },
+  forFact(factId: string, _rng: Rng): Gen {
+    const m = /^sq:(\d+)$/.exec(factId);
+    if (!m) throw new Error(`square-fact: bad fact id "${factId}"`);
+    return squareFactQuestion(Number(m[1]));
+  },
+  factBand(factId: string): Band {
+    const n = Number(factId.slice(3));
+    return n <= 12 ? 0 : n <= 18 ? 1 : n <= 25 ? 2 : 3;
   },
 };
 
