@@ -54,3 +54,7 @@ The repo carries `.github/workflows/pages.yml`. It only matters once a GitHub re
 - `docs/algorithm.md`: how spacing, unlocking, sessions, and benchmarks work.
 - `docs/content-sources.md`: where the methods came from and what was rejected.
 - `docs/DECISIONS.md`, `docs/STATE.md`: project history and status.
+
+## License
+
+Apache-2.0. See `LICENSE`.
