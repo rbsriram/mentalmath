@@ -32,6 +32,7 @@ import {
   recentAcc,
   status,
   type Rec,
+  type Status,
 } from './model';
 import type { State } from './state';
 import type { PhaseKind } from './session';
@@ -53,18 +54,56 @@ function recOf(state: State, id: string): Rec {
   return state.skills[id] ?? newRec();
 }
 
-// A skill is unlocked when every prereq is known or at least solid.
-// Skills without prereqs are always unlocked.
+// A skill is practicable when at least one template can serve it.
+// Concepts with no template (e.g. place-value) never gate unlocking.
+export function practicable(skillId: string): boolean {
+  return bySkill(skillId).length > 0;
+}
+
+// Implied knowledge: a skill counts as known when it is known itself, or
+// when any direct dependent of it is known (a learner who multiplies 2x2
+// correctly has demonstrated the distributive split it rests on). The memo
+// is per call so repeated checks inside one call share work.
+export function knownStar(
+  state: State,
+  skillId: string,
+  memo: Map<string, boolean> = new Map(),
+): boolean {
+  const hit = memo.get(skillId);
+  if (hit !== undefined) return hit;
+  const r = state.skills[skillId];
+  const result =
+    (r !== undefined && known(r)) ||
+    (CHILDREN.get(skillId) ?? []).some((d) => knownStar(state, d, memo));
+  memo.set(skillId, result);
+  return result;
+}
+
+// A skill is unlocked when every practicable prereq is known (directly or
+// by implication) and every impracticable prereq is a concept, which never
+// gates. Skills without prereqs are always unlocked.
 export function unlocked(state: State, skillId: string): boolean {
   const skill = SKILL_MAP.get(skillId);
   if (!skill) return false;
   if (skill.prereqs.length === 0) return true;
-  return skill.prereqs.every((p) => {
-    const r = state.skills[p];
-    if (!r || r.attempts === 0) return false;
-    const st = status(r);
-    return known(r) || st === 'solid' || st === 'strong';
-  });
+  const memo = new Map<string, boolean>();
+  return skill.prereqs.every(
+    (p) => knownStar(state, p, memo) || !practicable(p),
+  );
+}
+
+// The displayed status: 'implied' when the skill was never attempted but a
+// dependent already proves it. The Knowledge view uses this chip.
+export function effectiveStatus(
+  state: State,
+  skillId: string,
+): Status | 'implied' {
+  const r = recOf(state, skillId);
+  const st = status(r);
+  if (st === 'new' && r.attempts === 0 && knownStar(state, skillId)) {
+    return 'implied';
+  }
+  return st;
 }
 
 // Transitive dependents of a skill (skills that need it, directly or not).
@@ -81,15 +120,18 @@ export function dependents(skillId: string): string[] {
 }
 
 // Unlocked method/application skills that are not yet solid or strong,
-// most depended-upon first.
+// most depended-upon first. Skills implied known by a dependent but not
+// attempted themselves are excluded: there is nothing to teach.
 export function frontier(state: State): string[] {
-  const skills = SKILLS.filter(
-    (s) =>
-      (s.kind === 'method' || s.kind === 'application') &&
-      unlocked(state, s.id) &&
-      status(recOf(state, s.id)) !== 'solid' &&
-      status(recOf(state, s.id)) !== 'strong',
-  );
+  const memo = new Map<string, boolean>();
+  const skills = SKILLS.filter((s) => {
+    if (s.kind !== 'method' && s.kind !== 'application') return false;
+    if (!unlocked(state, s.id)) return false;
+    const r = recOf(state, s.id);
+    const st = status(r);
+    if (st === 'solid' || st === 'strong') return false;
+    return !(!known(r) && knownStar(state, s.id, memo));
+  });
   skills.sort(
     (a, b) =>
       dependents(b.id).length - dependents(a.id).length ||
@@ -131,8 +173,8 @@ export interface PickCtx {
   target: string | null;
   recentPrompts: string[];
   lastTemplateId: string | null;
-  customSkills?: string[];
-  customBand?: Band;
+  customSkills?: string[] | undefined;
+  customBand?: Band | undefined;
   counter: number; // caller increments; part of every seed
   nonce?: number; // session seed; defaults to `now`
 }
@@ -149,12 +191,14 @@ interface SkillCand {
   templateId: string;
 }
 
-// Resolve a skill to the template that would serve it.
-function candFor(skill: string, band: Band): SkillCand {
+// Resolve a skill to a serving template, chosen uniformly (with the rng)
+// among the skill's primary templates.
+function candFor(skill: string, band: Band, rng: Rng): SkillCand {
   const all = bySkill(skill);
   if (all.length === 0) throw new Error(`scheduler: no template for ${skill}`);
   const primary = all.filter((t) => t.skill === skill);
-  return { skill, band, templateId: (primary[0] ?? all[0]!).id };
+  const t = rng.pick(primary.length > 0 ? primary : all);
+  return { skill, band, templateId: t.id };
 }
 
 // Drop candidates whose template repeats the last one served, but only
@@ -236,7 +280,7 @@ export function pickQuestion(
     const pool = (ctx.customSkills ?? []).filter((id) => SKILL_MAP.has(id));
     const cands = dropRepeats(
       (pool.length > 0 ? pool : [SKILLS[0]!.id]).map((id) =>
-        candFor(id, ctx.customBand ?? recOf(state, id).level),
+        candFor(id, ctx.customBand ?? recOf(state, id).level, rng),
       ),
       ctx,
     );
@@ -256,7 +300,7 @@ export function pickQuestion(
     if (ctx.target !== null) {
       const rec = recOf(state, ctx.target);
       return {
-        question: serveSkill(candFor(ctx.target, rec.level), ctx, rng),
+        question: serveSkill(candFor(ctx.target, rec.level, rng), ctx, rng),
         bucket: 'target',
         transfer: false,
       };
@@ -278,7 +322,7 @@ export function pickQuestion(
     });
     if (eligible.length > 0) {
       const eligible2 = dropRepeats(
-        eligible.map((s) => candFor(s.id, recOf(state, s.id).level)),
+        eligible.map((s) => candFor(s.id, recOf(state, s.id).level, rng)),
         ctx,
       );
       const s = rng.pick(eligible2);
@@ -330,7 +374,7 @@ function practicePick(
 ): PickResult {
   const dueSkills = Object.keys(state.skills)
     .filter((id) => SKILL_MAP.has(id) && isDue(state.skills[id]!, now))
-    .map((id) => candFor(id, state.skills[id]!.level));
+    .map((id) => candFor(id, state.skills[id]!.level, rng));
   const dueFacts = Object.keys(state.facts).filter(
     (f) => factFamilyOf(f) !== null && isDue(state.facts[f]!, now),
   );
@@ -346,7 +390,7 @@ function practicePick(
       for (const id of prereqIds) {
         const r = state.skills[id];
         if (r && isFragile(r)) {
-          fragilePrereqs.push(candFor(id, r.level));
+          fragilePrereqs.push(candFor(id, r.level, rng));
         }
       }
     }
@@ -362,7 +406,7 @@ function practicePick(
     const st = status(r);
     if (st === 'solid' || st === 'strong') {
       transferCands.push(
-        candFor(s.id, Math.min(3, r.level + 1) as Band),
+        candFor(s.id, Math.min(3, r.level + 1) as Band, rng),
       );
       for (const t of bySkill(s.id)) {
         if (SKILL_MAP.get(t.skill)?.kind === 'application' || t.id === 'mixed-chain') {
@@ -378,7 +422,7 @@ function practicePick(
   })
     .sort((a, b) => recOf(state, a.id).lastSeen - recOf(state, b.id).lastSeen)
     .slice(0, 5)
-    .map((s) => candFor(s.id, recOf(state, s.id).level));
+    .map((s) => candFor(s.id, recOf(state, s.id).level, rng));
 
   const weights: [Bucket, number, boolean][] = [
     ['due', 0.25, dueSkills.length + dueFacts.length > 0],
@@ -443,7 +487,7 @@ function practicePick(
             ? ((rec.level + 1) as Band)
             : rec.level;
         return {
-          question: serveSkill(candFor(ctx.target, band), ctx, rng),
+          question: serveSkill(candFor(ctx.target, band, rng), ctx, rng),
           bucket,
           transfer: false,
         };
@@ -483,7 +527,7 @@ function practicePick(
     );
     const skill = first?.id ?? 'tables-1-10';
     return {
-      question: serveSkill(candFor(skill, 0), ctx, rng),
+      question: serveSkill(candFor(skill, 0, rng), ctx, rng),
       bucket: 'maintenance',
       transfer: false,
     };

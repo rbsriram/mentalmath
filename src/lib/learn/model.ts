@@ -9,13 +9,18 @@
 // Level (working band) promotion needs all of: the answered band equals the
 // working band, streak >= 4 after this answer, >= 6 recent outcomes with
 // accuracy >= 0.9, and a median recent correct time at or under the skill's
-// speed target. Demotion: >= 6 recent outcomes with accuracy < 0.5, and the
-// level is above 0. Wrong answers never promote or demote a band the user
-// was not working at.
+// speed target. Demotion: >= 6 recent outcomes with accuracy < 0.5, the
+// level is above 0, and the answered band equals the working band (a missed
+// stretch item above the level never demotes). Wrong answers never promote
+// or demote a band the user was not working at.
 //
-// Status ladder: new -> learning -> solid -> strong. `known` (attempts >= 2
-// and recent accuracy >= 0.8) is the unlock gate for dependents. `fragile`
-// means attempted but not yet reliable: accuracy < 0.8 or stability < 1 day.
+// `known` (attempts >= 2 and recent accuracy >= 0.8, or level >= 1) is the
+// unlock gate for dependents. The level >= 1 clause matters: the diagnostic
+// staircase ends probes with a wrong answer, so a learner correct at bands
+// 1-2 ends with accuracy below 0.8 but demonstrably knows the skill.
+//
+// Status ladder: new -> learning -> solid -> strong. `fragile` means
+// attempted but not yet reliable: accuracy < 0.8 or stability < 1 day.
 // `days` counts distinct local calendar days practised, from the local
 // timezone (not UTC), so status and streaks survive around midnight.
 
@@ -130,7 +135,8 @@ export function applyOutcome(
     out.due = o.now + WRONG_DELAY_DAYS * DAY_MS;
   }
 
-  // Band promotion / demotion.
+  // Band promotion / demotion. Both only apply when the answered band is
+  // the working band.
   const enoughRecent = out.recent.length >= 6;
   const acc = recentAcc(out);
   if (
@@ -144,7 +150,8 @@ export function applyOutcome(
     out.level < 3
   ) {
     out.level = (out.level + 1) as Band;
-  } else if (enoughRecent && acc < 0.5 && out.level > 0) {
+  }
+  if (o.band === out.level && enoughRecent && acc < 0.5 && out.level > 0) {
     out.level = (out.level - 1) as Band;
   }
   return out;
@@ -171,7 +178,7 @@ export function status(rec: Rec): Status {
 }
 
 export function known(rec: Rec): boolean {
-  return rec.attempts >= 2 && recentAcc(rec) >= 0.8;
+  return rec.attempts >= 2 && (recentAcc(rec) >= 0.8 || rec.level >= 1);
 }
 
 export function isFragile(rec: Rec): boolean {

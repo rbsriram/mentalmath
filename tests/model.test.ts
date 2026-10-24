@@ -125,11 +125,18 @@ describe('level promotion and demotion', () => {
     expect(r.level).toBe(0);
   });
 
-  it('demotes when recent accuracy drops below 0.5', () => {
+  it('demotes when recent accuracy drops below 0.5 at the working band', () => {
     let r = newRec();
     r = { ...r, level: 2 };
-    r = run(r, 6, false, 1000, 1);
+    r = run(r, 6, false, 1000, 2);
     expect(r.level).toBe(1);
+  });
+
+  it('a wrong stretch item above the level does not demote', () => {
+    let r = newRec();
+    r = { ...r, level: 2 };
+    r = run(r, 6, false, 1000, 3); // band 3 misses while working at level 2
+    expect(r.level).toBe(2);
   });
 
   it('does not demote at level 0', () => {
@@ -139,11 +146,14 @@ describe('level promotion and demotion', () => {
 });
 
 describe('predicates', () => {
-  it('known needs attempts >= 2 and acc >= 0.8', () => {
+  it('known needs attempts >= 2 and (acc >= 0.8 or level >= 1)', () => {
     expect(known(newRec())).toBe(false);
     expect(known(run(newRec(), 2, true))).toBe(true);
     const spotty = run(newRec(), 3, false);
     expect(known(spotty)).toBe(false);
+    // Diagnostic staircase ending on a miss: acc < 0.8 but level >= 1.
+    const diag = { ...spotty, level: 1 as const };
+    expect(known(diag)).toBe(true);
   });
 
   it('isFragile covers low accuracy and low stability', () => {

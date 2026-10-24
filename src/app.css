@@ -1,0 +1,397 @@
+:root {
+  --bg: #f7f6f3;
+  --fg: #1c1a17;
+  --muted: #6b6862;
+  --card: #ffffff;
+  --line: #e2e0da;
+  --accent: #2050b0;
+  --good: #1d7a3a;
+  --bad: #b03030;
+  --chip: #eceae4;
+  --radius: 10px;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
+    Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #141311;
+    --fg: #ece9e3;
+    --muted: #9a968e;
+    --card: #1e1c19;
+    --line: #34312c;
+    --accent: #7aa2f0;
+    --good: #4fca77;
+    --bad: #ef7070;
+    --chip: #292622;
+  }
+}
+
+:root[data-theme='dark'] {
+  --bg: #141311;
+  --fg: #ece9e3;
+  --muted: #9a968e;
+  --card: #1e1c19;
+  --line: #34312c;
+  --accent: #7aa2f0;
+  --good: #4fca77;
+  --bad: #ef7070;
+  --chip: #292622;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100%;
+}
+
+body {
+  line-height: 1.45;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1rem 1rem 6rem;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.2;
+  margin: 1.2rem 0 0.5rem;
+}
+
+h1 {
+  font-size: 1.4rem;
+}
+
+h2 {
+  font-size: 1.1rem;
+  color: var(--muted);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+p {
+  margin: 0.4rem 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: var(--radius);
+  padding: 0.6rem 1.1rem;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+button.secondary {
+  background: var(--chip);
+  color: var(--fg);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+input[type='text'],
+select {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.6rem 0.8rem;
+  min-height: 44px;
+}
+
+input[type='text'].answer {
+  font-size: 1.4rem;
+  width: 100%;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.problem {
+  font-size: clamp(2rem, 8vw, 3.5rem);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  margin: 1.5rem 0;
+  font-weight: 600;
+}
+
+.context {
+  text-align: center;
+  color: var(--muted);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 1rem;
+  margin: 0.8rem 0;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.good {
+  color: var(--good);
+}
+
+.bad {
+  color: var(--bad);
+}
+
+/* Navigation */
+nav {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  z-index: 10;
+}
+
+nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 1rem;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+nav a.active {
+  color: var(--fg);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+main {
+  padding-top: 3.5rem;
+}
+
+@media (max-width: 640px) {
+  nav {
+    top: auto;
+    bottom: 0;
+    border-bottom: 0;
+    border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  nav a {
+    flex: 1;
+    justify-content: center;
+  }
+
+  nav a.active {
+    box-shadow: inset 0 2px 0 var(--accent);
+  }
+
+  main {
+    padding-top: 1rem;
+  }
+}
+
+/* Status chips and badges */
+.chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: var(--chip);
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+.chip.new {
+  background: var(--chip);
+}
+.chip.implied {
+  background: var(--chip);
+  color: var(--accent);
+}
+.chip.learning {
+  background: var(--chip);
+  color: var(--accent);
+}
+.chip.solid {
+  background: var(--chip);
+  color: var(--good);
+}
+.chip.strong {
+  background: var(--chip);
+  color: var(--good);
+  font-weight: 700;
+}
+
+.badge {
+  display: inline-block;
+  min-width: 1.6rem;
+  text-align: center;
+  padding: 0.05rem 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+/* Skill rows */
+.skill-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  width: 100%;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  padding: 0.55rem 0.2rem;
+  text-align: left;
+  color: var(--fg);
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.skill-row .name {
+  flex: 1;
+}
+
+.skill-row .due {
+  color: var(--bad);
+  font-size: 0.8rem;
+}
+
+/* Fact grid */
+.fact-grid {
+  display: grid;
+  gap: 2px;
+  margin: 0.5rem 0;
+}
+
+.fact-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--chip);
+  color: transparent;
+  border: 0;
+  min-height: 0;
+  padding: 0;
+}
+
+.fact-cell.solid {
+  background: var(--good);
+}
+.fact-cell.learning {
+  background: color-mix(in srgb, var(--accent) 55%, var(--chip));
+}
+.fact-cell.fragile {
+  background: var(--bad);
+}
+
+/* Bars */
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.3rem 0;
+}
+
+.bar-track {
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--chip);
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.bar-fill.baseline {
+  background: var(--muted);
+}
+
+.bar-label {
+  width: 9rem;
+  font-size: 0.9rem;
+}
+
+.bar-val {
+  width: 3rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+/* Tables */
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+  font-size: 0.9rem;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 0.35rem 0.4rem;
+  border-bottom: 1px solid var(--line);
+  font-variant-numeric: tabular-nums;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* Route steps */
+ol.route {
+  margin: 0.5rem 0;
+  padding-left: 1.4rem;
+}
+
+ol.route li {
+  margin: 0.25rem 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

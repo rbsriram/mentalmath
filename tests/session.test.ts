@@ -4,12 +4,13 @@ import {
   answer,
   currentQuestion,
   finishSession,
+  markLessonShown,
   nextQuestion,
   pause,
   planSession,
   resume,
   summarize,
-  tickThinking,
+  tick,
   type Session,
 } from '../src/lib/learn/session';
 import { SKILLS } from '../src/lib/content/skills';
@@ -174,19 +175,38 @@ describe('session flow', () => {
     expect(after.current).toBeNull();
   });
 
-  it('tickThinking only counts while a question is shown', () => {
+  it('tick accrues whenever the session is live, question or not', () => {
     const state = fixture();
     let s = planSession(state, T0, 6);
-    s = tickThinking(s, 10_000); // nothing on screen yet
-    expect(s.phases[0]!.elapsedMs).toBe(0);
-    s = nextQuestion(state, s, createRng(1), T0);
-    s = tickThinking(s, 10_000);
+    s = tick(s, 10_000); // no question yet: still session time
     expect(s.phases[0]!.elapsedMs).toBe(10_000);
+    s = nextQuestion(state, s, createRng(1), T0);
+    s = tick(s, 10_000);
+    expect(s.phases[0]!.elapsedMs).toBe(20_000);
     s = pause(s);
-    s = tickThinking(s, 10_000);
-    expect(s.phases[0]!.elapsedMs).toBe(10_000); // paused
+    s = tick(s, 10_000);
+    expect(s.phases[0]!.elapsedMs).toBe(20_000); // paused
     s = resume(s);
     expect(s.paused).toBe(false);
+  });
+
+  it('answer does not add response time to the phase clock', () => {
+    const state = fixture();
+    const rng = createRng(14);
+    let s = planSession(state, T0, 7);
+    s = nextQuestion(state, s, rng, T0);
+    const q = currentQuestion(s)!;
+    const out = answer(state, s, displayAnswer(q.answer), 9000, T0 + 9000);
+    expect(out.session.phases[0]!.elapsedMs).toBe(0);
+  });
+
+  it('markLessonShown flags the session and the target record', () => {
+    const state = fixture();
+    let s = planSession(state, T0, 3);
+    const out = markLessonShown(state, s, T0);
+    expect(out.session.lessonShown).toBe(true);
+    expect(out.state.skills['mul-2x2']!.introduced).toBe(true);
+    expect(state.session).toBeNull();
   });
 
   it('summarize + finishSession append a capped summary', () => {

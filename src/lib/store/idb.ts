@@ -25,8 +25,8 @@ function withStore(
 ): Promise<unknown[]> {
   return new Promise((resolve, reject) => {
     const tx = db.transaction(stores, mode);
-    const requests = fn(tx);
-    tx.oncomplete = () => resolve(requests.map((r) => r.result));
+    const pending = fn(tx).map((r) => req<unknown>(r));
+    tx.oncomplete = () => void Promise.all(pending).then(resolve);
     tx.onerror = () => reject(tx.error ?? new Error('idb transaction failed'));
     tx.onabort = () => reject(tx.error ?? new Error('idb transaction aborted'));
   });
@@ -104,6 +104,3 @@ export class IdbStorage implements Storage {
     ]);
   }
 }
-
-// Unused directly; kept exported for focused request handling later.
-export { req };

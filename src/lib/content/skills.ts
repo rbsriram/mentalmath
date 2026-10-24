@@ -76,7 +76,7 @@ export const SKILLS: SkillNode[] = [
     family: 1,
     kind: 'fact',
     prereqs: ['tables-1-10'],
-    summary: 'Instant recall of squares up to 25^2 = 625.',
+    summary: 'Instant recall of squares up to 25² = 625.',
   },
   {
     id: 'squares-26-50',
@@ -84,7 +84,7 @@ export const SKILLS: SkillNode[] = [
     family: 1,
     kind: 'fact',
     prereqs: ['squares-1-25'],
-    summary: 'Recall or fast derivation of squares up to 50^2 = 2,500.',
+    summary: 'Recall or fast derivation of squares up to 50² = 2,500.',
   },
   {
     id: 'fraction-equivalents',
@@ -232,7 +232,7 @@ export const SKILLS: SkillNode[] = [
     family: 3,
     kind: 'method',
     prereqs: ['squares-1-25', 'mul-2x2'],
-    summary: 'Use n^2 = (n + k)(n - k) + k^2 with a round neighbour.',
+    summary: 'Use n² = (n + k)(n - k) + k² with a round neighbour.',
   },
   {
     id: 'square-ending-5',

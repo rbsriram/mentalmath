@@ -4,16 +4,16 @@
 // A phase never cuts a question in the middle: it only ends between
 // questions. The review phase drains the review queue (today's misses,
 // regenerated with fresh seeds) and ends early when the queue is empty.
-// Time accrues through `tickThinking` while a question is shown and through
-// the response `ms` recorded by `answer`. Callers should use one or the
-// other per question, not both.
+// Time accrues only through `tick`: the UI calls it on a timer while the
+// session is unpaused, and it counts everything, including reading a lesson
+// or feedback, because that is session time too.
 
 import { factTemplateFor, generate, generateFact } from '../engine/registry';
 import type { Band, Question } from '../engine/types';
 import type { CheckResult } from '../engine/answer';
 import { seedFor, type Rng } from '../math/rng';
 import type { Attempt } from './attempt';
-import { localDay } from './model';
+import { localDay, newRec } from './model';
 import { factFamilyOf } from '../content/facts';
 import { pickQuestion, type Bucket } from './scheduler';
 import { chooseTarget } from './scheduler';
@@ -275,15 +275,11 @@ export function answer(
         ]
       : session.slow;
 
-  const phases = session.phases.map((p, i) =>
-    i === session.phaseIndex ? { ...p, elapsedMs: p.elapsedMs + ms } : p,
-  );
-
+  // Response time does not add to the phase: `tick` owns the clock.
   return {
     state: outcome.state,
     session: {
       ...session,
-      phases,
       misses,
       reviewQueue,
       slow,
@@ -296,10 +292,10 @@ export function answer(
   };
 }
 
-// Wall-clock thinking time while a question is shown counts toward the
-// phase budget. Ignored while paused or when nothing is on screen.
-export function tickThinking(session: Session, deltaMs: number): Session {
-  if (session.paused || session.completed || session.current === null) {
+// Session time accrues through tick. The UI calls it on a timer; it counts
+// whenever the session is live, with or without a question on screen.
+export function tick(session: Session, deltaMs: number): Session {
+  if (session.paused || session.completed || session.phaseIndex >= session.phases.length) {
     return session;
   }
   return {
@@ -307,6 +303,27 @@ export function tickThinking(session: Session, deltaMs: number): Session {
     phases: session.phases.map((p, i) =>
       i === session.phaseIndex ? { ...p, elapsedMs: p.elapsedMs + deltaMs } : p,
     ),
+  };
+}
+
+// Marks the lesson card as shown and the target skill's record as
+// introduced. Pure: returns updated state and session.
+export function markLessonShown(
+  state: State,
+  session: Session,
+  _now: number,
+): { state: State; session: Session } {
+  if (session.target === null) {
+    return { state, session: { ...session, lessonShown: true } };
+  }
+  const rec = state.skills[session.target] ?? newRec();
+  const skills = {
+    ...state.skills,
+    [session.target]: { ...rec, introduced: true },
+  };
+  return {
+    state: { ...state, skills },
+    session: { ...session, lessonShown: true },
   };
 }
 
