@@ -213,7 +213,7 @@
   <button class="secondary" onclick={doExport}>Export</button>
   <button class="secondary" onclick={() => fileInput?.click()}>Import</button>
   <input bind:this={fileInput} type="file" accept="application/json" onchange={doImport} style="display:none" />
-  <button class="secondary" onclick={doReset}>Reset</button>
+  <button class="stop" onclick={doReset}>Reset</button>
   <select
     value={st.settings.theme}
     onchange={(e) =>
