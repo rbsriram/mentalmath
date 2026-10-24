@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   answerDiagnostic,
   applyDiagnosticPart,
+  PART_LABELS,
   currentItem,
   finishDiagnostic,
   hasStartingPoint,
@@ -236,5 +237,14 @@ describe('diagnostic in 4 parts', () => {
     expect(fin.state.diagnosticDone).toBe(true);
     expect(fin.state.baseline).not.toBeNull();
     expect(hasStartingPoint(fin.state)).toBe(true);
+  });
+});
+
+describe('part labels', () => {
+  it('each label maps to a part of 5 probes', () => {
+    expect(PART_LABELS).toHaveLength(4);
+    for (let i = 0; i < 4; i++) {
+      expect(PROBES.slice(i * 5, i * 5 + 5)).toHaveLength(5);
+    }
   });
 });

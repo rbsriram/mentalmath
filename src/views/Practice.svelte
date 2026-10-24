@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, untrack } from 'svelte';
-  import { app, commit, commitQuiet, go, loadAttempts, logAttempt } from '../lib/app.svelte';
+  import { app, commit, commitQuiet, go, harnessHook, loadAttempts, logAttempt } from '../lib/app.svelte';
   import { METHODS } from '../lib/content/methods';
   import { SKILLS } from '../lib/content/skills';
   import type { CheckResult } from '../lib/engine/answer';
@@ -412,25 +412,17 @@
     go('today');
   }
 
-  // Browser-harness hook: available in dev, or in production behind
-  // ?harness=1. Exposes the served question's answer and fast-forwards the
-  // session clock without persisting.
-  const HARNESS =
-    import.meta.env.MODE !== 'production' ||
-    (typeof location !== 'undefined' &&
-      new URLSearchParams(location.search).has('harness'));
-  if (HARNESS) {
-    (window as unknown as { __mm: unknown }).__mm = {
-      currentAnswer: () => (question ? displayAnswer(question.answer) : null),
-      session: () => (session ? $state.snapshot(session) : null),
-      state: () => (app.state ? $state.snapshot(app.state) : null),
-      fastForward: (ms: number) => {
-        if (session && !session.paused && !session.completed) {
-          const t = tick(session, ms);
-          session = t;
-          commitQuiet({ ...app.state!, session: t });
-        }
-      },
+  // Extend the harness hook from app.svelte.ts with runner helpers.
+  const mm = harnessHook();
+  if (mm) {
+    mm.currentAnswer = () => (question ? displayAnswer(question.answer) : null);
+    mm.session = () => (session ? $state.snapshot(session) : null);
+    mm.fastForward = (ms: number) => {
+      if (session && !session.paused && !session.completed) {
+        const t = tick(session, ms);
+        session = t;
+        commitQuiet({ ...app.state!, session: t });
+      }
     };
   }
 </script>

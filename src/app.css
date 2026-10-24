@@ -78,7 +78,22 @@ main {
   z-index: 1;
   max-width: 40rem;
   margin: 0 auto;
-  padding: 1rem 1rem 6rem;
+  padding: 2.5rem 1rem 6rem;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - var(--nav-h, 45px));
+}
+
+@media (min-width: 1280px) {
+  main {
+    max-width: 46rem;
+  }
+}
+
+@media (max-aspect-ratio: 1/1) {
+  main {
+    padding-top: 8vh;
+  }
 }
 
 h1,
@@ -274,12 +289,12 @@ input[type='text'].answer {
   }
 }
 
-/* Portrait: clear the decorated top band, keep the nav area free. */
-@media (max-aspect-ratio: 1/1) {
-  .panel {
-    margin-top: 8vh;
-  }
+/* Short panels center vertically; tall ones start at the top and
+   scroll, since auto margins collapse to zero on overflow. */
+.panel {
+  margin-block: auto;
 }
+
 
 /* Cards inside the panel become lighter inner sections. */
 .panel .card {
@@ -351,10 +366,6 @@ nav a.active {
   box-shadow: inset 0 -2px 0 var(--accent);
 }
 
-main {
-  padding-top: 3.5rem;
-}
-
 @media (max-width: 640px) {
   nav {
     top: auto;
@@ -374,7 +385,7 @@ main {
   }
 
   main {
-    padding-top: 1rem;
+    --nav-h: calc(45px + env(safe-area-inset-bottom));
   }
 }
 
@@ -437,6 +448,35 @@ main {
   }
 }
 
+
+/* Update pill */
+.update-pill {
+  position: fixed;
+  top: calc(0.5rem + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  min-height: 0;
+  cursor: pointer;
+  backdrop-filter: var(--glass, none);
+  -webkit-backdrop-filter: var(--glass, none);
+}
+
+:root[data-theme='dark'] .update-pill {
+  background: var(--card);
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme='system'] .update-pill {
+    background: var(--card);
+  }
+}
 
 /* Keys card overlay */
 .keys-card {

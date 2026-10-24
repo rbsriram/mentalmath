@@ -3,7 +3,7 @@
   import { app, startPractice } from '../lib/app.svelte';
   import { SKILLS } from '../lib/content/skills';
   import { benchmarkDue } from '../lib/learn/benchmark';
-  import { hasStartingPoint, partsDone } from '../lib/learn/diagnostic';
+  import { hasStartingPoint, PART_LABELS, partsDone } from '../lib/learn/diagnostic';
   import { practicable } from '../lib/learn/scheduler';
   import { planSession, type Session } from '../lib/learn/session';
   import { localDay } from '../lib/learn/model';
@@ -112,6 +112,11 @@
 {#if !started}
   <div class="card">
     <p>A short placement test comes first, in 4 parts of about 5 minutes.</p>
+    <ol>
+      {#each PART_LABELS as label}
+        <li>{label}</li>
+      {/each}
+    </ol>
     <button bind:this={btnDiag} onclick={() => startPractice('diagnostic')}>
       {diagPending ? 'Continue diagnostic' : 'Start diagnostic'}
     </button>
@@ -120,6 +125,11 @@
   {#if diagPending}
     <div class="card">
       <p><strong>Continue diagnostic</strong>, {4 - diagParts} parts left</p>
+      <ul>
+        {#each PART_LABELS.slice(diagParts) as label}
+          <li>{label}</li>
+        {/each}
+      </ul>
       <button bind:this={btnContinue} class="secondary" onclick={() => startPractice('diagnostic')}>
         Continue
       </button>

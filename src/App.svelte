@@ -95,6 +95,10 @@
 
 <div class="bg" style={`--bg-url: url("${bgUrl()}")`} aria-hidden="true"></div>
 
+{#if app.updateReady}
+  <button class="update-pill" onclick={() => location.reload()}>Updated. Reload</button>
+{/if}
+
 {#if app.keysOpen}
   <Keys />
 {/if}

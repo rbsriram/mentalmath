@@ -53,6 +53,15 @@ export interface DiagEntry {
 }
 
 export const PARTS = 4;
+
+// What each part probes, in probe order. Kept next to PROBES so the
+// labels stay honest when the probe list changes.
+export const PART_LABELS = [
+  'Tables, complements, squares, fraction and percent anchors',
+  'Addition, subtraction, two-digit and near-base multiplication, squaring',
+  'Division, decimals, percents',
+  'Reverse percents, discounts, ratios, estimation, multi-step',
+];
 const PROBES_PER_PART = PROBES.length / PARTS; // 5
 
 // Which of the 4 parts a probe index belongs to (0-based).

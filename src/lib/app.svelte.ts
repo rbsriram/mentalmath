@@ -21,6 +21,7 @@ export const app = $state({
   view: 'today' as View,
   detail: null as string | null,
   keysOpen: false,
+  updateReady: false,
   practiceMode: 'session' as PracticeMode,
   sessionShort: false,
   customSkills: [] as string[],
@@ -144,4 +145,23 @@ export function startPractice(
   app.customSkills = customSkills;
   app.customBand = customBand;
   go('practice');
+}
+
+// Test-harness hook: dev builds and ?harness=1 only. Practice.svelte
+// extends the same object with question helpers.
+const HARNESS =
+  import.meta.env.MODE !== 'production' ||
+  (typeof location !== 'undefined' &&
+    new URLSearchParams(location.search).has('harness'));
+if (HARNESS) {
+  (window as unknown as { __mm: Record<string, unknown> }).__mm = {
+    state: () => (app.state ? $state.snapshot(app.state) : null),
+    showUpdate: () => (app.updateReady = true),
+  };
+}
+
+export function harnessHook(): Record<string, unknown> | null {
+  return HARNESS
+    ? ((window as unknown as { __mm: Record<string, unknown> }).__mm ?? null)
+    : null;
 }
