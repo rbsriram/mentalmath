@@ -27,7 +27,9 @@
       ? `Start diagnostic round ${Math.min(4, partsDone(st.diagnostic) + 1)} of 4`
       : 'Start',
   );
-  const unfinished = $derived(st.round !== null && !st.round.done);
+  const unfinished = $derived(
+    st.round !== null && !st.round.done && st.round.date === localDay(now),
+  );
 
   let btnStart = $state<HTMLButtonElement | null>(null);
   let btnDiag = $state<HTMLButtonElement | null>(null);
@@ -40,7 +42,9 @@
   });
 
   function start() {
-    startPractice(nextKind(st) === 'diagnostic' ? 'diagnostic' : 'round');
+    // An unfinished round continues whatever its kind; otherwise the
+    // sequencing rule decides.
+    startPractice(unfinished || nextKind(st) !== 'diagnostic' ? 'round' : 'diagnostic');
   }
 </script>
 
@@ -49,7 +53,7 @@
 
 {#if !started}
   <div class="card">
-    <p>A short placement test comes first, in 4 parts of about 5 minutes.</p>
+    <p>A short placement test comes first, in 4 rounds of 5 probes.</p>
     <ol>
       {#each PART_LABELS as label}
         <li>{label}</li>

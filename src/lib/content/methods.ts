@@ -23,9 +23,6 @@ export interface Method {
 // recall drill. Authoring note: every key must exist in facts.ts
 // FACT_FAMILIES and every value must be a method id in this file.
 export const FAMILY_METHOD: Record<string, string> = {
-  tables: 'tables-anchors',
-  squares: 'squares-anchors',
-  'complements-10': 'complements-rule',
   'fraction-equivalents': 'frac-to-dec-pct',
   'percent-anchors': 'pct-anchors',
 };
@@ -593,7 +590,7 @@ export const METHODS: Method[] = [
       'Teens: 7 × 13 = 7 × 10 + 7 × 3.',
     ],
     limits: ['Anchors are the route in while recall lags; the table itself should end up automatic.'],
-    exampleTemplate: 'mul-multi-term',
+    exampleTemplate: 'mul-table-fact',
     exampleBand: 1,
     next: ['mul-distributive-split'],
   },
@@ -627,8 +624,8 @@ export const METHODS: Method[] = [
       '47² = 50 × 44 + 3² = 2200 + 9 = 2209.',
     ],
     limits: ['Below 25² the squares themselves should be recall, not computed.'],
-    exampleTemplate: 'mul-near-base',
-    exampleBand: 2,
+    exampleTemplate: 'square-general',
+    exampleBand: 1,
     next: ['mul-near-base'],
   },
 ];

@@ -223,7 +223,7 @@ describe('mixed bucket mix', () => {
     };
     const rng = createRng(9);
     for (let i = 0; i < 30; i++) {
-      const r = pickFactInFamily(state, rng, CTX(i), 'tables');
+      const r = pickFactInFamily(state, rng, T0, CTX(i), 'tables');
       expect(r.question.factId).toMatch(/^t:/);
     }
   });
@@ -237,5 +237,66 @@ describe('mixed bucket mix', () => {
       expect(r.topic).not.toBe(last);
       last = r.topic;
     }
+  });
+});
+
+describe('mixed due balance', () => {
+  it('due skills are not starved by hundreds of due facts', () => {
+    const facts: Record<string, ReturnType<typeof dueRec>> = {};
+    for (let i = 1; i <= 200; i++) {
+      facts[`t:${Math.min(15, (i % 14) + 1)}x${(i % 12) + 1}`] = dueRec();
+    }
+    const state: State = {
+      ...newState(T0),
+      skills: {
+        'add-left-to-right': dueRec(),
+        'sub-left-to-right': dueRec(),
+      },
+      facts,
+    };
+    const rng = createRng(77);
+    let skillDue = 0;
+    let factDue = 0;
+    for (let i = 0; i < 300; i++) {
+      const r = pickMixed(state, rng, T0, {
+        target: null,
+        recentPrompts: [],
+        lastTemplateId: null,
+        lastTopic: null,
+        counter: i,
+        nonce: 3,
+      });
+      if (r.bucket === 'due') {
+        if (r.question.factId === undefined) skillDue++;
+        else factDue++;
+      }
+    }
+    const share = skillDue / (skillDue + factDue);
+    expect(share).toBeGreaterThan(0.3);
+    expect(share).toBeLessThan(0.7);
+  });
+});
+
+describe('facts round due ordering', () => {
+  it('a fact due at t=100 is due at now=200 and not at now=50', () => {
+    const rec = { ...dueRec(), due: 100 };
+    const state: State = {
+      ...newState(T0),
+      facts: { 't:3x4': rec },
+    };
+    const ctx = {
+      target: null,
+      recentPrompts: [] as string[],
+      lastTemplateId: null,
+      lastTopic: null,
+      counter: 0,
+      nonce: 1,
+    };
+    const rng = createRng(4);
+    const at200 = pickFactInFamily(state, rng, 200, ctx, 'tables');
+    expect(at200.question.factId).toBe('t:3x4');
+    const ctx2 = { ...ctx, counter: 1 };
+    const at50 = pickFactInFamily(state, rng, 50, ctx2, 'tables');
+    expect(at50.question.factId).not.toBe('t:3x4');
   });
 });

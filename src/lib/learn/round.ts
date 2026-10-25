@@ -65,6 +65,8 @@ export interface Round {
   // A method card to show before `current` (skill target or fact family);
   // null when none or already dismissed. One card per round, ever.
   lesson: string | null;
+  // The fact family a lesson card teaches; null for a target method card.
+  lessonFamily: string | null;
   lessonShown: boolean;
   items: RoundItem[];
   done: boolean;
@@ -88,7 +90,9 @@ export function newRound(
 ): { round: Round; state: State } {
   const kind = opts.kind ?? 'mixed';
   let st = state;
-  if (kind === 'mixed' && st.target === null) {
+  if (kind === 'mixed') {
+    // Re-pick on every mixed round: a target that has gone solid or off
+    // the frontier must be replaced; chooseTarget keeps a live target.
     st = { ...st, target: chooseTarget(st) };
   }
   const round: Round = {
@@ -110,6 +114,7 @@ export function newRound(
     currentBucket: null,
     currentTransfer: false,
     lesson: null,
+    lessonFamily: null,
     lessonShown: false,
     items: [],
     done: false,
@@ -144,7 +149,7 @@ function lessonFor(
   round: Round,
   state: State,
   pick: PickResult,
-): string | null {
+): { method: string; family: string | null } | null {
   if (round.lessonShown) return null;
   const q = pick.question;
   if (q.factId !== undefined) {
@@ -155,14 +160,14 @@ function lessonFor(
       mid !== undefined &&
       !state.familyIntroduced[family]
     ) {
-      return mid;
+      return { method: mid, family };
     }
   }
   if (pick.bucket === 'target' && state.target !== null) {
     const rec = state.skills[state.target];
     if (rec !== undefined && !rec.introduced) {
       const m = METHOD_BY_SKILL.get(state.target);
-      if (m !== undefined) return m.id;
+      if (m !== undefined) return { method: m.id, family: null };
     }
   }
   return null;
@@ -176,7 +181,7 @@ export function serve(round: Round, state: State, now: number): Round {
   const rng = createRng(seedFor('round', round.seed, round.counter));
   let pick: PickResult;
   if (round.kind === 'facts') {
-    pick = pickFactInFamily(state, rng, ctxFor(round), round.topic as FactFamily);
+    pick = pickFactInFamily(state, rng, now, ctxFor(round), round.topic as FactFamily);
   } else if (round.kind === 'skill') {
     const pool = round.skills.length > 0 ? round.skills : [SKILLS[0]!.id];
     const skill = rng.pick(pool);
@@ -188,6 +193,7 @@ export function serve(round: Round, state: State, now: number): Round {
     pick = pickMixed(state, rng, now, { ...ctxFor(round), target: state.target });
   }
   const topic = topicOf(pick.question);
+  const lesson = lessonFor(round, state, pick);
   return {
     ...round,
     counter: round.counter + 1,
@@ -200,7 +206,8 @@ export function serve(round: Round, state: State, now: number): Round {
     currentTopic: topic,
     currentBucket: pick.bucket,
     currentTransfer: pick.transfer,
-    lesson: lessonFor(round, state, pick),
+    lesson: lesson?.method ?? null,
+    lessonFamily: lesson?.family ?? null,
     recentPrompts: [...round.recentPrompts, pick.question.prompt].slice(-20),
     lastTemplateId: pick.question.templateId,
     lastTopic: topic,
@@ -214,24 +221,24 @@ export function dismissLesson(
   round: Round,
   state: State,
 ): { round: Round; state: State } {
-  const mid = round.lesson;
-  if (mid === null) return { round, state };
-  const m = METHOD_BY_ID.get(mid);
+  if (round.lesson === null) return { round, state };
   let st = state;
-  if (m !== undefined && m.skill === state.target) {
-    const rec = st.skills[m.skill] ?? newRec();
-    st = {
-      ...st,
-      skills: { ...st.skills, [m.skill]: { ...rec, introduced: true } },
-    };
+  if (round.lessonFamily !== null) {
+    st = markFamilyIntroduced(st, round.lessonFamily);
   } else {
-    // A fact-family card: find the family whose method this is.
-    const family = Object.entries(FAMILY_METHOD).find(
-      ([, v]) => v === mid,
-    )?.[0];
-    if (family !== undefined) st = markFamilyIntroduced(st, family);
+    const m = METHOD_BY_ID.get(round.lesson);
+    if (m !== undefined) {
+      const rec = st.skills[m.skill] ?? newRec();
+      st = {
+        ...st,
+        skills: { ...st.skills, [m.skill]: { ...rec, introduced: true } },
+      };
+    }
   }
-  return { round: { ...round, lesson: null, lessonShown: true }, state: st };
+  return {
+    round: { ...round, lesson: null, lessonFamily: null, lessonShown: true },
+    state: st,
+  };
 }
 
 export interface AnswerOutcome {
@@ -267,7 +274,7 @@ export function answer(
   ];
   const done = items.length >= round.size;
   let r: Round = { ...round, items, current: null, currentTopic: null, done };
-  let st = out.state;
+  let st = { ...out.state, round: r };
   if (done) {
     const correctCount = items.filter((i) => i.correct).length;
     st = {

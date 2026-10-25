@@ -310,10 +310,25 @@ export function pickMixed(
   const dueFacts = Object.keys(state.facts).filter(
     (f) => factFamilyOf(f) !== null && isDue(state.facts[f]!, now),
   );
-  buckets.set('due', [
-    ...dropRepeats(dueSkills, ctx).map((c) => skillCand(c, ctx, rng, false)),
-    ...dueFacts.map((f) => factCand(f, ctx)),
-  ]);
+  // Keep due skills and due facts in separate candidate groups so the
+  // pick can balance them; a flat list would starve skills when hundreds
+  // of facts are due.
+  const dueSkillCands = dropRepeats(dueSkills, ctx).map((c) =>
+    skillCand(c, ctx, rng, false),
+  );
+  const dueFactCands = dueFacts.map((f) => factCand(f, ctx));
+  const dueBucket: Cand[] = [...dueSkillCands, ...dueFactCands];
+  buckets.set('due', dueBucket);
+  const serveDue = (): Cand | null => {
+    const sAlt = dueSkillCands.filter((c) => c.topic !== ctx.lastTopic);
+    const fAlt = dueFactCands.filter((c) => c.topic !== ctx.lastTopic);
+    if (sAlt.length > 0 && fAlt.length > 0) {
+      return rng.chance(0.5) ? rng.pick(sAlt) : rng.pick(fAlt);
+    }
+    if (sAlt.length > 0) return rng.pick(sAlt);
+    if (fAlt.length > 0) return rng.pick(fAlt);
+    return null;
+  };
 
   // target
   if (ctx.target !== null && SKILL_MAP.has(ctx.target)) {
@@ -416,19 +431,20 @@ export function pickMixed(
   // Variety: from the chosen bucket, drop lastTopic candidates when at
   // least one other topic remains. If the bucket is only lastTopic, walk
   // the bucket order from the chosen one until a different topic appears.
-  const pickFrom = (cands: Cand[]): Cand | null => {
+  const pickFrom = (b: MixedBucket, cands: Cand[]): Cand | null => {
+    if (b === 'due') return serveDue();
     const alt = cands.filter((c) => c.topic !== ctx.lastTopic);
     if (alt.length > 0) return rng.pick(alt);
     return null;
   };
 
-  let cand = pickFrom(buckets.get(chosen)!);
+  let cand = pickFrom(chosen, buckets.get(chosen)!);
   let bucket: MixedBucket = chosen;
   if (cand === null) {
     const start = BUCKET_ORDER.indexOf(chosen);
     for (let i = 1; i < BUCKET_ORDER.length; i++) {
       const b = BUCKET_ORDER[(start + i) % BUCKET_ORDER.length]!;
-      cand = pickFrom(buckets.get(b)!);
+      cand = pickFrom(b, buckets.get(b)!);
       if (cand !== null) {
         bucket = b;
         break;
@@ -458,6 +474,7 @@ export function pickMixed(
 export function pickFactInFamily(
   state: State,
   rng: Rng,
+  now: number,
   ctx: PickCtx,
   family: FactFamily,
 ): PickResult {
@@ -465,7 +482,7 @@ export function pickFactInFamily(
   const ids = listFacts(family);
   const due = ids.filter((f) => {
     const r = state.facts[f];
-    return r !== undefined && isDue(r, Date.now());
+    return r !== undefined && isDue(r, now);
   });
   const weak = ids.filter((f) => {
     const r = state.facts[f];

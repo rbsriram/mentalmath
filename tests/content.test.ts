@@ -253,12 +253,28 @@ describe('benchmark coverage', () => {
 });
 
 describe('fact family lessons', () => {
-  it('every fact family maps to an existing method', () => {
+  it('FAMILY_METHOD has exactly the two taught families', () => {
     const ids = new Set(METHODS.map((m) => m.id));
-    for (const family of FACT_FAMILIES) {
-      const mid = FAMILY_METHOD[family];
-      expect(mid, `${family} has no method mapping`).toBeDefined();
-      expect(ids.has(mid!), `${family} -> ${mid} is not a method`).toBe(true);
+    expect(Object.keys(FAMILY_METHOD).sort()).toEqual([
+      'fraction-equivalents',
+      'percent-anchors',
+    ]);
+    for (const [, mid] of Object.entries(FAMILY_METHOD)) {
+      expect(ids.has(mid)).toBe(true);
+    }
+  });
+
+  it('anchor family cards use the right example templates', () => {
+    const t = METHODS.find((m) => m.id === 'tables-anchors')!;
+    expect(t.exampleTemplate).toBe('mul-table-fact');
+    const sq = METHODS.find((m) => m.id === 'squares-anchors')!;
+    expect(sq.exampleTemplate).toBe('square-general');
+  });
+
+  it('every method example template exists', () => {
+    const ids = new Set(TEMPLATES.map((t) => t.id));
+    for (const m of METHODS) {
+      expect(ids.has(m.exampleTemplate), `${m.id} -> ${m.exampleTemplate}`).toBe(true);
     }
   });
 });

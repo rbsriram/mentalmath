@@ -152,11 +152,13 @@
   <div class="card">
     <h3 style="margin-top:0">Complements</h3>
     <p>
+      Pairs to 10:
       {#each sheet.complements.pairs as pr, i}{i > 0 ? ', ' : ''}<span class="comp {tint(pr.factId)}">{pr.a} + {pr.b}</span>{/each}
     </p>
-    <p class="muted">{sheet.complements.rule}</p>
+    <p><strong>Rule.</strong> {sheet.complements.rule}</p>
     <p>
-      {#each sheet.complements.examples as ex, i}{i > 0 ? ', ' : ''}{ex.n} → {ex.complement}{/each}
+      To 100: {sheet.complements.examples.filter((e) => e.base === 100).map((e) => `${e.n} → ${e.complement}`).join(', ')}<br />
+      To 1,000: {sheet.complements.examples.filter((e) => e.base === 1000).map((e) => `${e.n} → ${e.complement}`).join(', ')}
     </p>
     <button class="secondary" onclick={() => drillSkill(['complements-100', 'complements-1000'])}>Drill</button>
   </div>

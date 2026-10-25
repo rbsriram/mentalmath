@@ -143,7 +143,9 @@
   );
 
   // The round-between card data.
-  const roundDone = $derived(mode === 'round' && round !== null && round.done);
+  const roundDone = $derived(
+    mode === 'round' && round !== null && round.done && shown === null,
+  );
   const diagBoundary = $derived(mode === 'diagnostic' && diag !== null && (diag.done || diag.partBoundary));
   const misses = $derived(round === null ? 0 : round.items.filter((i) => !i.correct).length);
 
@@ -266,7 +268,6 @@
           ...applyDiagnosticPart(app.state!, diag, Date.now()),
           lastRoundKind: standalone ? app.state!.lastRoundKind : 'diagnostic',
         });
-        app.running = false;
         finishing = false;
         if (standalone) go('today');
       }
@@ -281,7 +282,6 @@
     const attempts = await loadAttempts();
     const out = finishDiagnostic(app.state!, diag!, attempts, Date.now());
     commit({ ...out.state, lastRoundKind: 'diagnostic' });
-    app.running = false;
     finishing = false;
     // The "Diagnostic complete" card stays on screen; Again gives mixed.
   }
@@ -300,8 +300,9 @@
   }
 
   function stopRun() {
-    if (mode === 'round' && round && !round.done) {
+    if (mode === 'round' && round) {
       commit({ ...app.state!, round: null });
+      round = null;
     }
     leaveRun();
   }
@@ -320,7 +321,6 @@
   }
 
   function again() {
-    const opts = app.roundOpts;
     // The sequencing rule: Again follows nextKind. Skill/facts rounds
     // repeat their own topic instead.
     if (mode === 'round' && round && (round.kind === 'skill' || round.kind === 'facts')) {
@@ -340,10 +340,12 @@
       finishing = false;
       return;
     }
-    startPractice('round', opts, app.runOrigin);
+    // Mixed follow-up: create the round here rather than through
+    // startPractice, which would re-navigate and re-arm practiceExplicit.
+    app.roundOpts = { kind: 'mixed' };
     mode = 'round';
     app.running = true;
-    const out = newRound(st, Date.now(), Math.floor(rng.next() * 2147483647), opts);
+    const out = newRound(st, Date.now(), Math.floor(rng.next() * 2147483647), app.roundOpts);
     commit({ ...out.state, round: out.round });
     round = out.round;
     shown = null;
@@ -364,7 +366,8 @@
     } else if (pickTopic.startsWith('facts:')) {
       startPractice('round', { kind: 'facts', topic: pickTopic.slice(6) }, 'practice');
     } else if (pickTopic === 'skill:complements') {
-      startPractice('round', { kind: 'skill', skills: ['complements-100', 'complements-1000'] }, 'practice');
+      const band = pickBand === 'auto' ? null : (Number(pickBand) as 0|1|2|3);
+      startPractice('round', { kind: 'skill', skills: ['complements-100', 'complements-1000'], band }, 'practice');
     } else {
       const band = pickBand === 'auto' ? null : (Number(pickBand) as 0|1|2|3);
       startPractice('round', { kind: 'skill', skills: [pickTopic], band }, 'practice');

@@ -21,6 +21,7 @@ import { generate, generateFact, factTemplateFor } from '../src/lib/engine/regis
 import { factFamilyOf } from '../src/lib/content/facts';
 import { isDue, newRec, type Rec } from '../src/lib/learn/model';
 import { newState, type State } from '../src/lib/learn/state';
+import { METHODS } from '../src/lib/content/methods';
 import { displayAnswer } from '../src/lib/math/format';
 import { createRng } from '../src/lib/math/rng';
 import type { Question } from '../src/lib/engine/types';
@@ -255,5 +256,72 @@ describe('rounds', () => {
     const s = strongCount(state);
     expect(s.strong).toBe(1);
     expect(s.total).toBeGreaterThan(0);
+  });
+});
+
+describe('round target and lesson bookkeeping', () => {
+  it('newRound re-picks a target that went solid', () => {
+    // mul-2x2 is solid and off the frontier; the frontier offers others.
+    const state: State = {
+      ...newState(T0),
+      diagnosticDone: true,
+      target: 'mul-2x2',
+      skills: {
+        'mul-2x2': { ...SOLID },
+        'mul-near-base': { ...newRec(), attempts: 4, level: 1, introduced: true, due: T0 + DAY },
+        'mul-distributive': { ...newRec(), attempts: 4, level: 1, introduced: true, due: T0 + DAY },
+      },
+    };
+    const out = newRound(state, T0, 1, { kind: 'mixed' });
+    expect(out.state.target).not.toBe('mul-2x2');
+  });
+
+  it('family lesson marks familyIntroduced, not the target introduced flag', () => {
+    // The frac-to-dec-pct method's skill doubles as the target here;
+    // dismissing the family card must set familyIntroduced only.
+    const famSkill = METHODS.find((m) => m.id === 'frac-to-dec-pct')!.skill;
+    const st2: State = {
+      ...newState(T0),
+      diagnosticDone: true,
+      target: famSkill,
+      skills: { [famSkill]: { ...newRec(), attempts: 2, level: 1, introduced: false, due: T0 + DAY } },
+      facts: {},
+    };
+    // Craft a served fact item of the fraction family manually.
+    const round: Round = {
+      id: 'r1', kind: 'mixed', topic: null, skills: [], band: null,
+      size: 10, seed: 1, startedAt: T0, date: '2025-01-10',
+      counter: 0, recentPrompts: [], lastTemplateId: null, lastTopic: null,
+      current: { templateId: 'frac-to-dec-pct', seed: 1, band: 0, factId: 'fe:1/4' },
+      currentTopic: 'fraction-equivalents', currentBucket: 'newfact', currentTransfer: false,
+      lesson: 'frac-to-dec-pct', lessonFamily: 'fraction-equivalents',
+      lessonShown: false, items: [], done: false,
+    };
+    const out = dismissLesson(round, st2);
+    expect(out.state.familyIntroduced['fraction-equivalents']).toBe(true);
+    expect(out.state.skills[famSkill]!.introduced).toBe(false);
+    expect(out.round.lesson).toBeNull();
+    expect(out.round.lessonFamily).toBeNull();
+  });
+
+  it('target lesson marks the skill introduced, not the family', () => {
+    const state: State = {
+      ...newState(T0),
+      diagnosticDone: true,
+      target: 'mul-near-base',
+      skills: { 'mul-near-base': { ...LEARN } },
+    };
+    const round: Round = {
+      id: 'r2', kind: 'mixed', topic: null, skills: [], band: null,
+      size: 10, seed: 1, startedAt: T0, date: '2025-01-10',
+      counter: 0, recentPrompts: [], lastTemplateId: null, lastTopic: null,
+      current: { templateId: 'mul-near-base', seed: 1, band: 1 },
+      currentTopic: 'mul-near-base', currentBucket: 'target', currentTransfer: false,
+      lesson: 'mul-near-base', lessonFamily: null,
+      lessonShown: false, items: [], done: false,
+    };
+    const out = dismissLesson(round, state);
+    expect(out.state.skills['mul-near-base']!.introduced).toBe(true);
+    expect(Object.keys(out.state.familyIntroduced)).toHaveLength(0);
   });
 });
