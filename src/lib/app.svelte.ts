@@ -3,14 +3,14 @@
 // through `commit` (debounced persist) and `logAttempt`.
 
 import type { Attempt } from './learn/attempt';
-import { localDay } from './learn/model';
-import { finishSession } from './learn/session';
+import type { RoundKind } from './learn/round';
+import type { Band } from './engine/types';
 import { migrate, newState, type State } from './learn/state';
 import { IdbStorage } from './store/idb';
 import type { Storage } from './store/storage';
 
 export type View = 'today' | 'practice' | 'knowledge' | 'progress';
-export type PracticeMode = 'session' | 'diagnostic' | 'benchmark' | 'custom';
+export type PracticeMode = 'round' | 'diagnostic' | 'benchmark';
 
 export const app = $state({
   ready: false,
@@ -22,8 +22,14 @@ export const app = $state({
   detail: null as string | null,
   keysOpen: false,
   updateReady: false,
-  practiceMode: 'session' as PracticeMode,
-  sessionShort: false,
+  practiceMode: 'round' as PracticeMode,
+  // Options handed to the next round run (kind/topic/skills/band).
+  roundOpts: {} as {
+    kind?: RoundKind;
+    topic?: string;
+    skills?: string[];
+    band?: Band | null;
+  },
   // One-shot intent set by startPractice and consumed by the Practice
   // view; cleared whenever the view changes away from practice.
   practiceExplicit: false,
@@ -31,8 +37,6 @@ export const app = $state({
   // Stop takes the user back to runOrigin.
   running: false,
   runOrigin: 'today' as 'today' | 'practice' | 'knowledge',
-  customSkills: [] as string[],
-  customBand: null as number | null,
 });
 
 let storage: Storage | null = null;
@@ -43,8 +47,7 @@ export function getStorage(): Storage {
   return storage;
 }
 
-// Loads the state document once, finishing any leftover session from an
-// earlier day. Safe to call more than once.
+// Loads the state document once. Safe to call more than once.
 export async function init(store: Storage = getStorage()): Promise<void> {
   try {
     let s = await store.loadState();
@@ -53,15 +56,6 @@ export async function init(store: Storage = getStorage()): Promise<void> {
       void navigator.storage?.persist?.();
     } else {
       s = migrate(s);
-      // A session from a previous day is closed out silently; a fresh plan
-      // is shown today.
-      if (
-        s.session !== null &&
-        !s.session.completed &&
-        s.session.date !== localDay(Date.now())
-      ) {
-        s = finishSession(s, s.session, Date.now());
-      }
     }
     app.state = s;
     app.ready = true;
@@ -85,12 +79,6 @@ export async function loadAttempts(): Promise<Attempt[]> {
 export function commit(next: State): void {
   app.state = next;
   scheduleSave(next);
-}
-
-// Sets the state without persisting; used for per-second session ticks so
-// IndexedDB stays quiet. Any later commit or flush saves the same data.
-export function commitQuiet(next: State): void {
-  app.state = next;
 }
 
 export function logAttempt(a: Attempt): void {
@@ -146,16 +134,17 @@ export function go(view: View, detail: string | null = null): void {
 
 export function startPractice(
   mode: PracticeMode,
-  customSkills: string[] = [],
-  customBand: number | null = null,
-  sessionShort = false,
+  opts: {
+    kind?: RoundKind;
+    topic?: string;
+    skills?: string[];
+    band?: Band | null;
+  } = {},
   runOrigin: 'today' | 'practice' | 'knowledge' = 'today',
 ): void {
   app.practiceMode = mode;
   app.practiceExplicit = true;
-  app.sessionShort = sessionShort;
-  app.customSkills = customSkills;
-  app.customBand = customBand;
+  app.roundOpts = opts;
   app.runOrigin = runOrigin;
   app.running = true;
   go('practice');

@@ -48,7 +48,7 @@
   const ret30 = $derived(retention(app.attempts, 30));
   const recentSpeed = $derived(recentMedianP90(app.attempts, now));
   const latest = $derived(st.benchmarks.at(-1) ?? null);
-  const lastTen = $derived(st.sessions.slice(-10).reverse());
+  const lastTen = $derived(st.days.slice(-10).reverse());
 
   function pct(x: number | null): string {
     return x === null ? 'not yet' : `${Math.round(x * 100)}%`;
@@ -100,8 +100,8 @@
 
 <h1>Progress</h1>
 
-{#if !st.baseline && st.sessions.length === 0}
-  <p class="muted">Progress appears after the diagnostic and your first sessions.</p>
+{#if !st.baseline && st.days.length === 0}
+  <p class="muted">Progress appears after the diagnostic and your first rounds.</p>
 {:else}
   {#if famRows.length > 0 || st.diagnostic}
     <h2>Baseline vs now</h2>
@@ -191,14 +191,14 @@
   {/if}
 
   {#if lastTen.length > 0}
-    <h2>Recent sessions</h2>
+    <h2>Days</h2>
     <table>
-      <thead><tr><th>Date</th><th>Minutes</th><th>Answered</th><th>Accuracy</th></tr></thead>
+      <thead><tr><th>Date</th><th>Rounds</th><th>Answered</th><th>Accuracy</th></tr></thead>
       <tbody>
         {#each lastTen as s}
           <tr>
             <td>{s.date}</td>
-            <td>{s.minutes}</td>
+            <td>{s.rounds}</td>
             <td>{s.answered}</td>
             <td>{s.answered > 0 ? Math.round((s.correct / s.answered) * 100) : 0}%</td>
           </tr>

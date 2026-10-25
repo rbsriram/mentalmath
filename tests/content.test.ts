@@ -3,6 +3,7 @@ import { SKILLS } from '../src/lib/content/skills';
 import { FAMILY_METHOD, METHODS } from '../src/lib/content/methods';
 import {
   complementFactId,
+  factFamilyOf,
   FACT_FAMILIES,
   fractionFactId,
   listFacts,
@@ -63,8 +64,7 @@ describe('fact families', () => {
   it('produces the expected finite fact sets', () => {
     expect(listFacts('tables').length).toBe(120);
     expect(listFacts('squares').length).toBe(30);
-    expect(listFacts('complements-100').length).toBe(99);
-    expect(listFacts('complements-1000').length).toBe(999);
+    expect(listFacts('complements-10').length).toBe(9);
     expect(listFacts('fraction-equivalents').length).toBe(25);
     expect(listFacts('percent-anchors').length).toBe(6);
   });
@@ -182,7 +182,7 @@ describe('fact generation', () => {
           expected = rat(Number(m[1]) * Number(m[2]));
         } else if (family === 'squares') {
           expected = rat(Number(factId.slice(3)) ** 2);
-        } else if (family.startsWith('complements')) {
+        } else if (family === 'complements-10') {
           const m = /^c(\d+):(\d+)$/.exec(factId)!;
           expected = rat(Number(m[1]) - Number(m[2]));
         } else if (family === 'fraction-equivalents') {
@@ -260,5 +260,15 @@ describe('fact family lessons', () => {
       expect(mid, `${family} has no method mapping`).toBeDefined();
       expect(ids.has(mid!), `${family} -> ${mid} is not a method`).toBe(true);
     }
+  });
+});
+
+describe('complements as a rule', () => {
+  it('no 100/1000 fact family exists; old ids resolve to null', () => {
+    expect(factFamilyOf('c100:37')).toBeNull();
+    expect(factFamilyOf('c1000:370')).toBeNull();
+    expect(factFamilyOf('c10:7')).toBe('complements-10');
+    const s = SKILLS.find((x) => x.id === 'complements-100')!;
+    expect(s.kind).toBe('method');
   });
 });

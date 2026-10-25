@@ -11,8 +11,6 @@
     'squares-1-25': 'squares',
     'squares-26-50': 'squares',
     'complements-10': 'complements-10',
-    'complements-100': 'complements-100',
-    'complements-1000': 'complements-1000',
     'fraction-equivalents': 'fraction-equivalents',
     'percent-anchors': 'percent-anchors',
   };
@@ -63,10 +61,10 @@
       <div class={cellClass(f)} title={f}></div>
     {/each}
   </div>
-{:else if family === 'complements-100' || family === 'complements-10' || family === 'complements-1000'}
+{:else if family === 'complements-10'}
   <div
     class="fact-grid"
-    style="grid-template-columns: repeat({family === 'complements-1000' ? 40 : 10}, 1fr)"
+    style="grid-template-columns: repeat({10}, 1fr)"
   >
     {#each facts as f}
       <div class={cellClass(f)} title={f}></div>

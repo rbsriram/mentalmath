@@ -1,17 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { app, go, startPractice } from '../lib/app.svelte';
-  import { SKILLS } from '../lib/content/skills';
   import { benchmarkDue } from '../lib/learn/benchmark';
   import { hasStartingPoint, PART_LABELS, partsDone } from '../lib/learn/diagnostic';
-  import { planSession, type Session } from '../lib/learn/session';
+  import { dueCounts, nextKind, strongCount } from '../lib/learn/round';
   import { localDay } from '../lib/learn/model';
-  import type { State } from '../lib/learn/state';
 
   const st = $derived(app.state!);
   const now = Date.now();
-
-  const skillName = new Map(SKILLS.map((s) => [s.id, s.name]));
 
   const today = $derived(
     new Date(now).toLocaleDateString(undefined, {
@@ -21,58 +17,31 @@
     }),
   );
 
-  const session = $derived(st.session);
-  const sessionToday = $derived(
-    session !== null && session.date === localDay(now) && !session.completed,
-  );
-  const plan = $derived<Session>(
-    sessionToday ? session! : planSession(st, now, now % 100000),
-  );
-  const completedSummary = $derived(
-    st.sessions.at(-1)?.date === localDay(now) ? st.sessions.at(-1)! : null,
-  );
-
-  // Placement status.
   const diagPending = $derived(st.diagnostic !== null && !st.diagnosticDone);
   const started = $derived(hasStartingPoint(st));
-
-  // In-progress session: "N of 30 min done. Next: Practice, 12 min".
-  const elapsedMin = $derived(
-    sessionToday
-      ? Math.floor(session!.phases.reduce((x, p) => x + p.elapsedMs, 0) / 60000)
-      : 0,
+  const due = $derived(dueCounts(st, now));
+  const strong = $derived(strongCount(st));
+  const dayToday = $derived(st.days.find((d) => d.date === localDay(now)) ?? null);
+  const startLabel = $derived(
+    nextKind(st) === 'diagnostic' && st.diagnostic
+      ? `Start diagnostic round ${Math.min(4, partsDone(st.diagnostic) + 1)} of 4`
+      : 'Start',
   );
-  const nextPhase = $derived(
-    sessionToday && session!.phaseIndex < session!.phases.length
-      ? session!.phases[session!.phaseIndex]!
-      : null,
-  );
+  const unfinished = $derived(st.round !== null && !st.round.done);
 
   let btnStart = $state<HTMLButtonElement | null>(null);
   let btnDiag = $state<HTMLButtonElement | null>(null);
 
   onMount(() => {
     const s = app.state!;
-    const inProgress =
-      s.session !== null && !s.session.completed && s.session.date === localDay(now);
     const pending = s.diagnostic !== null && !s.diagnosticDone;
-    if (inProgress) btnStart?.focus();
-    else if (pending) btnDiag?.focus();
+    if (pending) btnDiag?.focus();
     else (btnStart ?? btnDiag)?.focus();
   });
 
-  function fmtPhase(kind: string): string {
-    return kind[0]!.toUpperCase() + kind.slice(1);
-  }
-
   function start() {
-    startPractice('session');
+    startPractice(nextKind(st) === 'diagnostic' ? 'diagnostic' : 'round');
   }
-
-  function startShort() {
-    startPractice('session', [], null, true);
-  }
-
 </script>
 
 <h1>Today</h1>
@@ -103,61 +72,21 @@
     </div>
   {/if}
 
-  {#if completedSummary}
-    <div class="card">
-      <h3 style="margin-top:0">Done for today</h3>
+  <div class="card">
+    <p>
+      {due.facts + due.skills > 0
+        ? `Due now: ${due.facts} facts, ${due.skills} skills.`
+        : 'Nothing due right now.'}
+    </p>
+    {#if dayToday && dayToday.rounds > 0}
       <p>
-        {completedSummary.minutes} min, {completedSummary.answered} answered,
-        {completedSummary.answered > 0
-          ? Math.round((completedSummary.correct / completedSummary.answered) * 100)
-          : 0}% correct
-        {#if completedSummary.newMethod}
-          . New method: {skillName.get(completedSummary.newMethod) ?? completedSummary.newMethod}
-        {/if}
+        Today: {dayToday.rounds} {dayToday.rounds === 1 ? 'round' : 'rounds'},
+        {dayToday.correct} of {dayToday.answered} right.
       </p>
-      <button class="secondary" onclick={() => go('practice')}>
-        Practice more
-      </button>
-    </div>
-  {:else}
-    <div class="card">
-      <h3 style="margin-top:0">Your session</h3>
-      {#if sessionToday}
-        <p>
-          {elapsedMin} of {session!.short ? 10 : 30} min done.
-          {#if nextPhase}
-            Next: {fmtPhase(nextPhase.kind)}, {Math.max(0, Math.ceil((nextPhase.budgetMs - nextPhase.elapsedMs) / 60000))} min
-          {/if}
-        </p>
-      {/if}
-      <ul>
-        {#each plan.phases as phase}
-          {#if phase.budgetMs > 0}
-            <li>
-              {#if phase.kind === 'diagnostic' && st.diagnostic}
-                Diagnostic part {Math.min(4, partsDone(st.diagnostic) + 1)} of 4: {Math.round(phase.budgetMs / 60000)} min
-              {:else}
-                {fmtPhase(phase.kind)}: {Math.round(phase.budgetMs / 60000)} min
-              {/if}
-              {#if phase.kind === 'learn' && plan.target}
-                <span class="muted">
-                  ({skillName.get(plan.target) ?? plan.target})
-                </span>
-              {/if}
-              {#if phase.elapsedMs > 0}
-                <span class="muted">- {Math.round(phase.elapsedMs / 6000) / 10} min done</span>
-              {/if}
-            </li>
-          {/if}
-        {/each}
-      </ul>
-      <div style="display:flex;gap:0.5rem">
-        <button bind:this={btnStart} onclick={start}>{sessionToday ? 'Resume' : 'Start'}</button>
-        {#if !sessionToday}
-          <button class="secondary" onclick={startShort}>10 minutes</button>
-        {/if}
-      </div>
-    </div>
-  {/if}
-
+    {/if}
+    <p class="muted">{strong.strong} of {strong.total} skills strong.</p>
+    <button bind:this={btnStart} onclick={start}>
+      {unfinished ? 'Continue round' : startLabel}
+    </button>
+  </div>
 {/if}

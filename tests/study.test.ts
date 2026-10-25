@@ -20,12 +20,15 @@ describe('study sheet', () => {
     expect(sheet.tables.cells[3]![4]!.factId).toBe('t:4x5');
   });
 
-  it('has 30 squares, 25 fractions, 6 anchors, 3 complement bases', () => {
+  it('has 30 squares, 25 fractions, 6 anchors, 5 complement pairs', () => {
     expect(sheet.squares).toHaveLength(30);
     expect(sheet.fractions).toHaveLength(25);
     expect(sheet.anchors).toHaveLength(6);
-    expect(sheet.complements).toHaveLength(3);
-    for (const c of sheet.complements) expect(c.examples).toHaveLength(6);
+    expect(sheet.complements.pairs).toHaveLength(5);
+    expect(sheet.complements.rule).toMatch(/^Work from the right\./);
+    const ex = sheet.complements.examples;
+    expect(ex.find((e) => e.n === 370)?.complement).toBe(630);
+    expect(ex.find((e) => e.base === 100 && e.n === 68)?.complement).toBe(32);
   });
 
   it('every factId exists in its family', () => {
@@ -56,15 +59,16 @@ describe('study sheet', () => {
     }
   });
 
-  it('complement examples are deterministic and correct', () => {
+  it('complement pairs and examples are deterministic and correct', () => {
     const again = studySheet();
-    for (let i = 0; i < 3; i++) {
-      const a = sheet.complements[i]!;
-      const b = again.complements[i]!;
-      expect(a.examples).toEqual(b.examples);
-      for (const ex of a.examples) {
-        expect(ex.n + ex.complement).toBe(a.base);
-      }
+    expect(again.complements).toEqual(sheet.complements);
+    for (const p of sheet.complements.pairs) {
+      expect(p.a + p.b).toBe(10);
     }
+    for (const ex of sheet.complements.examples) {
+      expect(ex.n + ex.complement).toBe(ex.base);
+    }
+    const ids = new Set(listFacts('complements-10'));
+    for (const p of sheet.complements.pairs) expect(ids.has(p.factId)).toBe(true);
   });
 });

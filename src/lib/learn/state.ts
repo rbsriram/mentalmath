@@ -10,32 +10,33 @@ import type { Question } from '../engine/types';
 import { familySkillForFact } from '../content/facts';
 import { displayAnswer } from '../math/format';
 import { applyOutcome, newRec, type Rec } from './model';
+import { factFamilyOf } from '../content/facts';
 import { speedTargetMs } from './targets';
 import type { Attempt, AttemptPhase } from './attempt';
-import type { Session } from './session';
+import type { Round, RoundKind } from './round';
 import type { DiagnosticState } from './diagnostic';
 import type { BenchmarkReport, BenchmarkState } from './benchmark';
 
-export interface SessionSummary {
-  id: string;
+export interface DaySummary {
   date: string; // local 'YYYY-MM-DD'
-  minutes: number;
+  rounds: number;
   answered: number;
   correct: number;
-  target: string | null;
-  newMethod: string | null;
 }
 
 export interface State {
-  version: 3;
+  version: 4;
   createdAt: number;
   skills: Record<string, Rec>;
   facts: Record<string, Rec>;
   target: string | null;
-  session: Session | null;
+  round: Round | null;
   diagnostic: DiagnosticState | null;
   benchmark: BenchmarkState | null;
-  sessions: SessionSummary[]; // newest last, cap 400
+  days: DaySummary[]; // newest last, cap 400
+  // Kind of the last finished round (or 'diagnostic'); drives what Start
+  // serves next. Set only when a run finishes, never on Stop.
+  lastRoundKind: RoundKind | 'diagnostic' | null;
   diagnosticDone: boolean;
   baseline: BenchmarkReport | null;
   benchmarks: BenchmarkReport[];
@@ -47,15 +48,16 @@ export interface State {
 
 export function newState(now: number): State {
   return {
-    version: 3,
+    version: 4,
     createdAt: now,
     skills: {},
     facts: {},
     target: null,
-    session: null,
+    round: null,
     diagnostic: null,
     benchmark: null,
-    sessions: [],
+    days: [],
+    lastRoundKind: null,
     diagnosticDone: false,
     baseline: null,
     benchmarks: [],
@@ -79,9 +81,45 @@ export const MIGRATIONS: Record<number, (s: unknown) => unknown> = {
     const d = doc as Record<string, unknown>;
     return { ...d, familyIntroduced: {}, version: 3 };
   },
+  3: (doc) => {
+    // v3 -> v4: timed sessions become rounds. The in-flight session is
+    // dropped; each old session summary becomes a day entry (merged per
+    // date, one round per session). Fact records for families that no
+    // longer exist (complements to 100/1,000 are a rule, not facts) are
+    // dropped.
+    const d = doc as Record<string, unknown>;
+    const oldSessions = Array.isArray(d.sessions)
+      ? (d.sessions as { date?: string; answered?: number; correct?: number }[])
+      : [];
+    const byDate = new Map<string, { date: string; rounds: number; answered: number; correct: number }>();
+    for (const s0 of oldSessions) {
+      if (typeof s0.date !== 'string') continue;
+      const cur = byDate.get(s0.date) ?? { date: s0.date, rounds: 0, answered: 0, correct: 0 };
+      cur.rounds += 1;
+      cur.answered += typeof s0.answered === 'number' ? s0.answered : 0;
+      cur.correct += typeof s0.correct === 'number' ? s0.correct : 0;
+      byDate.set(s0.date, cur);
+    }
+    const facts: Record<string, unknown> = {};
+    for (const [id, rec] of Object.entries(
+      (d.facts ?? {}) as Record<string, unknown>,
+    )) {
+      if (factFamilyOf(id) !== null) facts[id] = rec;
+    }
+    delete d.session;
+    delete d.sessions;
+    return {
+      ...d,
+      facts,
+      round: null,
+      days: [...byDate.values()].slice(-400),
+      lastRoundKind: null,
+      version: 4,
+    };
+  },
 };
 
-const LATEST_VERSION = 3;
+const LATEST_VERSION = 4;
 
 function isPlainObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -113,8 +151,9 @@ export function migrate(raw: unknown): State {
     typeof d.createdAt !== 'number' ||
     !isPlainObject(d.skills) ||
     !isPlainObject(d.facts) ||
-    !Array.isArray(d.sessions) ||
+    !Array.isArray(d.days) ||
     !Array.isArray(d.benchmarks) ||
+    !isPlainObject(d.familyIntroduced) ||
     typeof d.diagnosticDone !== 'boolean' ||
     !isPlainObject(d.settings)
   ) {

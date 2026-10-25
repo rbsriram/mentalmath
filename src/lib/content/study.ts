@@ -3,6 +3,7 @@
 // examples stay stable between sessions.
 
 import {
+  complementFactId,
   FRACTION_EQUIVALENTS,
   fractionFactId,
   PERCENT_ANCHORS,
@@ -11,7 +12,6 @@ import {
   tableFactId,
 } from './facts';
 import { isTerminating, rat, toDecimal, toDisplay } from '../math/rational';
-import { createRng, seedFor } from '../math/rng';
 
 export interface StudyTable {
   rows: number[];
@@ -20,14 +20,15 @@ export interface StudyTable {
 }
 
 export interface StudyComplement {
-  base: 10 | 100 | 1000;
+  // The five digit pairs to 10, the only complements to memorize.
+  pairs: { a: number; b: number; factId: string }[];
   rule: string;
-  examples: { n: number; complement: number }[];
+  examples: { base: 100 | 1000; n: number; complement: number }[];
 }
 
 export interface StudySheet {
   tables: StudyTable;
-  complements: StudyComplement[];
+  complements: StudyComplement;
   squares: { n: number; sq: number; factId: string }[];
   fractions: { fraction: string; decimal: string; percent: string; factId: string }[];
   anchors: { percent: number; method: string; example: string; factId: string }[];
@@ -42,11 +43,20 @@ const ANCHOR_METHOD: Record<number, string> = {
   75: 'Half plus a quarter',
 };
 
-const COMPLEMENT_RULE: Record<number, string> = {
-  10: 'The digit you add to reach 10.',
-  100: 'First digit goes to 9, the last goes to 10.',
-  1000: 'Every digit goes to 9 except the last, which goes to 10.',
-};
+// Complements to 100 and 1,000 are a rule, not memorized pairs. The rule
+// text is the user's wording; the worked examples are fixed, not seeded.
+const COMPLEMENT_RULE =
+  'Work from the right. Keep all trailing zeros. Subtract the first non-zero digit from 10, then every digit to its left from 9.';
+const COMPLEMENT_EXAMPLES: StudyComplement['examples'] = [
+  { base: 100, n: 68, complement: 32 },
+  { base: 100, n: 40, complement: 60 },
+  { base: 100, n: 7, complement: 93 },
+  { base: 100, n: 25, complement: 75 },
+  { base: 1000, n: 437, complement: 563 },
+  { base: 1000, n: 370, complement: 630 },
+  { base: 1000, n: 900, complement: 100 },
+  { base: 1000, n: 55, complement: 945 },
+];
 
 function decOf(n: number, d: number): string {
   const v = rat(n, d);
@@ -68,14 +78,16 @@ export function studySheet(): StudySheet {
     range.map((b) => ({ product: a * b, factId: tableFactId(a, b) })),
   );
 
-  const bases = [10, 100, 1000] as const;
-  const complements: StudyComplement[] = bases.map((base) => {
-    const examples = Array.from({ length: 6 }, (_, i) => {
-      const n = createRng(seedFor('study', base, i)).int(1, base - 1);
-      return { n, complement: base - n };
-    });
-    return { base, rule: COMPLEMENT_RULE[base]!, examples };
-  });
+  const pairs = [1, 2, 3, 4, 5].map((a) => ({
+    a,
+    b: 10 - a,
+    factId: complementFactId(10, a),
+  }));
+  const complements: StudyComplement = {
+    pairs,
+    rule: COMPLEMENT_RULE,
+    examples: COMPLEMENT_EXAMPLES,
+  };
 
   const squares = Array.from({ length: 30 }, (_, i) => {
     const n = i + 1;

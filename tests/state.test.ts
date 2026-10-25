@@ -8,11 +8,11 @@ const T0 = new Date(2025, 0, 10, 9, 0, 0).getTime();
 describe('newState and migrate', () => {
   it('builds a versioned empty document', () => {
     const s = newState(T0);
-    expect(s.version).toBe(3);
+    expect(s.version).toBe(4);
     expect(s.createdAt).toBe(T0);
     expect(s.skills).toEqual({});
     expect(s.facts).toEqual({});
-    expect(s.sessions).toEqual([]);
+    expect(s.days).toEqual([]);
     expect(s.benchmarks).toEqual([]);
     expect(s.diagnosticDone).toBe(false);
     expect(s.settings.theme).toBe('light');
@@ -21,7 +21,7 @@ describe('newState and migrate', () => {
   it('migrate accepts a valid v1 document', () => {
     const s = newState(T0);
     const round = migrate(JSON.parse(JSON.stringify(s)));
-    expect(round.version).toBe(3);
+    expect(round.version).toBe(4);
     expect(round.createdAt).toBe(T0);
   });
 
@@ -32,10 +32,10 @@ describe('newState and migrate', () => {
       'text',
       [],
       { version: 'one' },
-      { version: 0, createdAt: 1, skills: {}, facts: {}, sessions: [], benchmarks: [], diagnosticDone: false, settings: {} },
-      { version: 99, createdAt: 1, skills: {}, facts: {}, sessions: [], benchmarks: [], diagnosticDone: false, settings: {} },
-      { version: 1, createdAt: 'x', skills: {}, facts: {}, sessions: [], benchmarks: [], diagnosticDone: false, settings: {} },
-      { version: 1, createdAt: 1, skills: [], facts: {}, sessions: [], benchmarks: [], diagnosticDone: false, settings: {} },
+      { version: 0, createdAt: 1, skills: {}, facts: {}, days: [], benchmarks: [], diagnosticDone: false, settings: {} },
+      { version: 99, createdAt: 1, skills: {}, facts: {}, days: [], benchmarks: [], diagnosticDone: false, settings: {} },
+      { version: 1, createdAt: 'x', skills: {}, facts: {}, days: [], benchmarks: [], diagnosticDone: false, settings: {} },
+      { version: 1, createdAt: 1, skills: [], facts: {}, days: [], benchmarks: [], diagnosticDone: false, settings: {} },
     ]) {
       expect(() => migrate(bad), JSON.stringify(bad)).toThrow('unsupported export');
     }
@@ -88,7 +88,7 @@ describe('version 2 migration', () => {
   it('a v1 document with system theme migrates to v2 light', () => {
     const v1 = { ...newState(T0), version: 1, settings: { theme: 'system' } };
     const doc = migrate(v1);
-    expect(doc.version).toBe(3);
+    expect(doc.version).toBe(4);
     expect(doc.settings.theme).toBe('light');
   });
 
@@ -101,7 +101,7 @@ describe('version 2 migration', () => {
   it('a v2 document passes through untouched', () => {
     const s = newState(T0);
     const doc = migrate(s);
-    expect(doc.version).toBe(3);
+    expect(doc.version).toBe(4);
     expect(doc.settings.theme).toBe('light');
   });
 });
@@ -111,7 +111,7 @@ describe('version 3 migration', () => {
     const v2 = { ...newState(T0), version: 2 };
     delete (v2 as Record<string, unknown>).familyIntroduced;
     const doc = migrate(v2);
-    expect(doc.version).toBe(3);
+    expect(doc.version).toBe(4);
     expect(doc.familyIntroduced).toEqual({});
   });
 
@@ -120,5 +120,33 @@ describe('version 3 migration', () => {
     v3.familyIntroduced = { tables: true };
     const doc = migrate(JSON.parse(JSON.stringify(v3)));
     expect(doc.familyIntroduced).toEqual({ tables: true });
+  });
+});
+
+describe('version 4 migration', () => {
+  it('v3 -> v4: session dropped, sessions merge into days, dead families dropped', () => {
+    const v3 = newState(T0) as unknown as Record<string, unknown>;
+    v3.version = 3;
+    v3.session = { id: 's1', date: '2025-01-10' };
+    v3.sessions = [
+      { id: 'a', date: '2025-01-10', minutes: 30, answered: 20, correct: 15 },
+      { id: 'b', date: '2025-01-10', minutes: 30, answered: 10, correct: 7 },
+      { id: 'c', date: '2025-01-11', minutes: 30, answered: 12, correct: 9 },
+    ];
+    v3.facts = { 'c100:37': {}, 'c10:7': {}, 't:3x4': {} };
+    delete v3.round;
+    delete v3.days;
+    delete v3.lastRoundKind;
+    const doc = migrate(v3);
+    expect(doc.version).toBe(4);
+    expect(doc.round).toBeNull();
+    expect(doc.lastRoundKind).toBeNull();
+    expect(doc.days.find((d) => d.date === '2025-01-10')).toEqual({
+      date: '2025-01-10', rounds: 2, answered: 30, correct: 22,
+    });
+    expect(doc.days.find((d) => d.date === '2025-01-11')!.rounds).toBe(1);
+    expect(doc.facts['c100:37']).toBeUndefined();
+    expect(doc.facts['c10:7']).toBeDefined();
+    expect(doc.facts['t:3x4']).toBeDefined();
   });
 });

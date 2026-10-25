@@ -2,10 +2,15 @@
 // benchmarks, retention metrics, and export.
 
 import type { Band } from '../engine/types';
-import type { PhaseKind } from './session';
-
+// Old session phase names stay in the union so stored logs still
+// type-check; new attempts use 'round', 'diagnostic', or 'benchmark'.
 export type AttemptPhase =
-  | PhaseKind
+  | 'recall'
+  | 'learn'
+  | 'practice'
+  | 'timed'
+  | 'review'
+  | 'round'
   | 'diagnostic'
   | 'benchmark'
   | 'custom';

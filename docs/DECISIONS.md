@@ -62,4 +62,16 @@ Each entry is numbered so STATE.md and code comments can reference it (e.g. "see
 
 **Why:** The user's point: base knowledge is rote. Show the sheet, let the learner study it, then test it, instead of inferring from a placement item whether a fact is known.
 
+## #10 — Rounds of 10 replace timed sessions; the app does not count time (2026-10-25)
+
+**Decision:** The 30-minute session machine is gone. Practice happens in rounds of exactly 10 questions that end by themselves. No clocks, minutes, phases, Pause, or Resume anywhere; per-answer response time still feeds the spaced model. Mixed rounds interleave topics from weighted buckets (due, target, learning, new facts, maintenance) with a hard rule against repeating a topic twice in a row.
+
+**Why:** The user will not sit through a 30-minute plan with long single-topic blocks; two minutes of one topic already bores them. Short varied rounds keep momentum, and interleaving is better pedagogy anyway. Everything still records per answer, so stopping loses nothing.
+
+## #11 — Complements to 100/1000 are a method with the nines rule; only pairs to 10 are facts (2026-10-25)
+
+**Decision:** The complements-100 and complements-1000 fact families (1,107 stored facts) are deleted. Complements to 10 stay facts (5 pairs). Larger complements are taught as a method: work from the right, keep trailing zeros, subtract the first non-zero digit from 10 and every digit to its left from 9. The skills `complements-100` and `complements-1000` changed kind from `fact` to `method`.
+
+**Why:** 1,107 complement facts are not memorization, they are one rule applied digit by digit. Modeling them as facts would waste review effort on a skill that should be derived once and practiced as a method.
+
 <!-- copy the block above for each new decision; never edit or delete past entries -->

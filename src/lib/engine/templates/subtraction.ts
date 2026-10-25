@@ -31,7 +31,7 @@ function complementRoute(base: number, n: number): Step[] {
   }
   const steps: Step[] = [
     step(
-      `Take each digit of ${fi(n)} from 9 except the last nonzero, which comes from 10 (target ${fi(base)})`,
+      `Work from the right: keep trailing zeros, take the first non-zero digit from 10, every digit to its left from 9 to reach ${fi(base)}`,
       R(base),
     ),
   ];
@@ -128,9 +128,8 @@ function complementQuestion(base: number, n: number): Gen {
     strategies: ['sub-complements'],
     route,
     inputMode: 'decimal',
-    // Bases 10/100/1000 are tracked fact families; base 10,000 is not.
-    factId:
-      base <= 1000 ? complementFactId(base as 10 | 100 | 1000, n) : undefined,
+    // Only pairs to 10 are tracked facts; larger complements are the rule.
+    factId: base === 10 ? complementFactId(10, n) : undefined,
   };
 }
 
@@ -145,13 +144,12 @@ export const complement: Template = {
     return complementQuestion(base, rng.int(lo, base - 1));
   },
   forFact(factId: string, _rng: Rng): Gen {
-    const m = /^c(10|100|1000):(\d+)$/.exec(factId);
+    const m = /^c10:(\d+)$/.exec(factId);
     if (!m) throw new Error(`complement: bad fact id "${factId}"`);
-    return complementQuestion(Number(m[1]), Number(m[2]));
+    return complementQuestion(10, Number(m[1]));
   },
-  factBand(factId: string): Band {
-    const base = Number(factId.slice(1).split(':')[0]);
-    return base <= 10 ? 0 : base <= 100 ? 1 : base <= 1000 ? 2 : 3;
+  factBand(): Band {
+    return 0;
   },
 };
 

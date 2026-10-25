@@ -5,8 +5,6 @@ export const FACT_FAMILIES = [
   'tables',
   'squares',
   'complements-10',
-  'complements-100',
-  'complements-1000',
   'fraction-equivalents',
   'percent-anchors',
 ] as const;
@@ -89,16 +87,6 @@ export function listFacts(family: FactFamily): string[] {
       for (let n = 1; n <= 9; n++) out.push(complementFactId(10, n));
       return out;
     }
-    case 'complements-100': {
-      const out: string[] = [];
-      for (let n = 1; n <= 99; n++) out.push(complementFactId(100, n));
-      return out;
-    }
-    case 'complements-1000': {
-      const out: string[] = [];
-      for (let n = 1; n <= 999; n++) out.push(complementFactId(1000, n));
-      return out;
-    }
     case 'fraction-equivalents':
       return FRACTION_EQUIVALENTS.map(([n, d]) => fractionFactId(n, d));
     case 'percent-anchors':
@@ -117,10 +105,6 @@ export function factFamilyOf(factId: string): FactFamily | null {
       return /^\d+$/.test(m[2]!) ? 'squares' : null;
     case 'c10':
       return 'complements-10';
-    case 'c100':
-      return 'complements-100';
-    case 'c1000':
-      return 'complements-1000';
     case 'fe':
       return /^\d+\/\d+$/.test(m[2]!) ? 'fraction-equivalents' : null;
     case 'pa':
@@ -144,8 +128,6 @@ export function familySkillForFact(factId: string): string | null {
     return n <= 25 ? 'squares-1-25' : 'squares-26-50';
   }
   if (family === 'complements-10') return 'complements-10';
-  if (family === 'complements-100') return 'complements-100';
-  if (family === 'complements-1000') return 'complements-1000';
   if (family === 'fraction-equivalents') return 'fraction-equivalents';
   return 'percent-anchors';
 }

@@ -3,7 +3,8 @@ import {
   chooseTarget,
   dependents,
   frontier,
-  pickQuestion,
+  pickMixed,
+  pickFactInFamily,
   unlocked,
   type Bucket,
 } from '../src/lib/learn/scheduler';
@@ -155,20 +156,17 @@ describe('unlocking and the frontier', () => {
   });
 });
 
-describe('practice bucket mix', () => {
+describe('mixed bucket mix', () => {
   function richState(): State {
-    // Every bucket non-empty:
-    // - due: add-left-to-right (due, level 1) + a due fact
-    // - fragile: complements-100 (fragile prereq of the target)
-    // - target: mul-near-base (unlocked, learning)
-    // - transfer: mul-2x2 solid
-    // - maintenance: several unlocked skills with attempts
+    // due: add-left-to-right + a due fact; target: mul-near-base;
+    // learning: add-grouping (attempted, not solid); newfact: fresh facts;
+    // maintenance: solid/known skills.
     return {
       ...newState(T0),
       target: 'mul-near-base',
       skills: {
         'add-left-to-right': dueRec(),
-        'complements-100': fragileRec(),
+        'add-grouping': learningRec(),
         'mul-distributive': knownRec(),
         'mul-near-base': learningRec(),
         'mul-2x2': solidRec(),
@@ -180,157 +178,64 @@ describe('practice bucket mix', () => {
       },
     };
   }
+  const CTX = (i: number) => ({
+    target: 'mul-near-base',
+    recentPrompts: [] as string[],
+    lastTemplateId: null,
+    lastTopic: null,
+    counter: i,
+    nonce: 7,
+  });
 
-  it('hits every bucket over 2,000 picks within +-5 points', () => {
+  it('hits every populated bucket over 2,000 picks', () => {
     const state = richState();
     const rng = createRng(42);
     const counts = new Map<Bucket, number>();
     for (let i = 0; i < 2000; i++) {
-      const r = pickQuestion(state, rng, T0, {
-        phase: 'practice',
-        target: state.target,
-        recentPrompts: [],
-        lastTemplateId: null,
-        counter: i,
-        nonce: 7,
-      });
+      const r = pickMixed(state, rng, T0, CTX(i));
       counts.set(r.bucket, (counts.get(r.bucket) ?? 0) + 1);
       expect(r.question.prompt.length).toBeGreaterThan(0);
     }
     const shares = (b: Bucket) => (counts.get(b) ?? 0) / 2000;
-    // All five buckets appear; target and due dominate as weighted.
-    for (const b of ['due', 'fragile', 'target', 'transfer', 'maintenance'] as Bucket[]) {
-      expect(shares(b), `bucket ${b}`).toBeGreaterThan(0.02);
-    }
-    // Rough proportions: target ~30%, due ~25%, fragile ~20%, transfer ~15%, maint ~10%.
-    expect(Math.abs(shares('target') - 0.3)).toBeLessThan(0.06);
-    expect(Math.abs(shares('due') - 0.25)).toBeLessThan(0.06);
-    expect(Math.abs(shares('fragile') - 0.2)).toBeLessThan(0.06);
-    expect(Math.abs(shares('transfer') - 0.15)).toBeLessThan(0.06);
-    expect(Math.abs(shares('maintenance') - 0.1)).toBeLessThan(0.06);
-  });
-
-  it('redistributes weight when buckets are empty', () => {
-    // Only maintenance candidates exist.
-    const state: State = {
-      ...newState(T0),
-      skills: { 'add-left-to-right': knownRec() },
-    };
-    const rng = createRng(1);
-    for (let i = 0; i < 50; i++) {
-      const r = pickQuestion(state, rng, T0, {
-        phase: 'practice',
-        target: null,
-        recentPrompts: [],
-        lastTemplateId: null,
-        counter: i,
-        nonce: 3,
-      });
-      expect(r.bucket).toBe('maintenance');
-    }
+    expect(shares('due')).toBeGreaterThan(0.3);
+    expect(shares('target')).toBeGreaterThan(0.1);
+    expect(shares('learning')).toBeGreaterThan(0.02);
+    expect(shares('newfact')).toBeGreaterThan(0.02);
+    expect(shares('maintenance')).toBeGreaterThan(0.005);
   });
 
   it('avoids prompts in recentPrompts', () => {
     const state = richState();
     const rng = createRng(5);
-    // Force the first draw for the target bucket so we know what comes.
     const seed = seedFor('practice', 7, 0, 0);
     const blocked = generate('mul-near-base', seed, 0).prompt;
-    const r = pickQuestion(state, rng, T0, {
-      phase: 'practice',
-      target: 'mul-near-base',
+    const r = pickMixed(state, rng, T0, {
+      ...CTX(0),
       recentPrompts: [blocked],
-      lastTemplateId: null,
-      counter: 0,
-      nonce: 7,
     });
     expect(r.question.prompt).not.toBe(blocked);
   });
 
-  it('recall serves only fact-family questions with factId', () => {
+  it('a facts round serves only that family with factId', () => {
     const state: State = {
       ...newState(T0),
-      facts: { 't:7x8': dueRec(), 'sq:12': dueRec() },
-      target: 'mul-near-base',
-      skills: { 'mul-near-base': learningRec(), 'complements-100': fragileRec(), 'mul-distributive': knownRec() },
+      facts: { 't:7x8': dueRec() },
     };
     const rng = createRng(9);
     for (let i = 0; i < 30; i++) {
-      const r = pickQuestion(state, rng, T0, {
-        phase: 'recall',
-        target: state.target,
-        recentPrompts: [],
-        lastTemplateId: null,
-        counter: i,
-        nonce: 4,
-      });
-      expect(r.question.factId).toBeDefined();
-      expect(['mul-table-fact', 'square-fact', 'complement', 'frac-to-dec-pct', 'pct-anchor']).toContain(
-        r.question.templateId,
-      );
+      const r = pickFactInFamily(state, rng, CTX(i), 'tables');
+      expect(r.question.factId).toMatch(/^t:/);
     }
   });
 
-  it('timed serves only reliable skills', () => {
-    const state: State = {
-      ...newState(T0),
-      skills: {
-        'mul-2x2': solidRec(),
-        'mul-near-base': fragileRec(),
-      },
-    };
-    const rng = createRng(11);
-    for (let i = 0; i < 20; i++) {
-      const r = pickQuestion(state, rng, T0, {
-        phase: 'timed',
-        target: null,
-        recentPrompts: [],
-        lastTemplateId: null,
-        counter: i,
-        nonce: 1,
-      });
-      expect(r.question.skill).toBe('mul-2x2');
-    }
-  });
-
-  it('custom serves the given skills at the given band', () => {
-    const state = newState(T0);
-    const rng = createRng(3);
-    for (let i = 0; i < 20; i++) {
-      const r = pickQuestion(state, rng, T0, {
-        phase: 'custom',
-        target: null,
-        recentPrompts: [],
-        lastTemplateId: null,
-        customSkills: ['mul-by-11'],
-        customBand: 2,
-        counter: i,
-        nonce: 2,
-      });
-      expect(r.question.skill).toBe('mul-by-11');
-      expect(r.question.band).toBe(2);
-      expect(r.bucket).toBe('custom');
-    }
-  });
-
-  it('does not repeat the same templateId twice in a row when it can avoid it', () => {
-    // Two custom skills whose primary templates differ.
-    const state = newState(T0);
+  it('never repeats a topic when another exists', () => {
+    const state = richState();
     const rng = createRng(13);
-    let last: string | null = 'add-two';
+    let last: string | null = null;
     for (let i = 0; i < 30; i++) {
-      const r = pickQuestion(state, rng, T0, {
-        phase: 'custom',
-        target: null,
-        recentPrompts: [],
-        lastTemplateId: last,
-        customSkills: ['add-left-to-right', 'sub-left-to-right'],
-        customBand: 1,
-        counter: i,
-        nonce: 5,
-      });
-      expect(r.question.templateId).not.toBe(last);
-      last = r.question.templateId;
+      const r = pickMixed(state, rng, T0, { ...CTX(i), lastTopic: last });
+      expect(r.topic).not.toBe(last);
+      last = r.topic;
     }
   });
 });

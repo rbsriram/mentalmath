@@ -1,11 +1,12 @@
-// Question scheduling: what to serve next in each session phase.
+// Question scheduling: what to serve next in a round.
 //
-// Buckets (practice weights): due 0.25, fragile 0.20, target 0.30,
-// transfer 0.15, maintenance 0.10. Empty buckets drop out and the remaining
-// weights renormalize. Other phases override the mix: recall serves facts
-// only, learn serves the target, timed serves only reliable skills, review
-// is handled by the session (it regenerates missed templates), and custom
-// serves a caller-supplied skill list.
+// Mixed rounds draw from weighted buckets (tune from use): due 0.45
+// (due facts plus due skills), target 0.25, learning 0.15 (attempted but
+// not solid skills), newfact 0.10 (unattempted sheet facts), and
+// maintenance/transfer 0.05. Empty buckets drop out and the remaining
+// weights renormalize. The hard variety rule: never serve the same topic
+// (fact family or skill id) twice in a row while any other topic is
+// available.
 
 import { SKILLS } from '../content/skills';
 import {
@@ -35,7 +36,6 @@ import {
   type Status,
 } from './model';
 import type { State } from './state';
-import type { PhaseKind } from './session';
 
 const SKILL_MAP = new Map(SKILLS.map((s) => [s.id, s]));
 const TEMPLATE_MAP = new Map(TEMPLATES.map((t) => [t.id, t]));
@@ -154,28 +154,27 @@ export function chooseTarget(state: State): string | null {
 
 export type Bucket =
   | 'due'
-  | 'fragile'
   | 'target'
-  | 'transfer'
+  | 'learning'
+  | 'newfact'
   | 'maintenance'
   | 'fact'
-  | 'custom';
+  | 'skill';
 
 export interface PickCtx {
-  phase: PhaseKind | 'custom';
   target: string | null;
   recentPrompts: string[];
   lastTemplateId: string | null;
-  customSkills?: string[] | undefined;
-  customBand?: Band | undefined;
+  lastTopic: string | null;
   counter: number; // caller increments; part of every seed
-  nonce?: number; // session seed; defaults to `now`
+  nonce?: number; // round seed; defaults to `now`
 }
 
 export interface PickResult {
   question: Question;
   bucket: Bucket;
   transfer: boolean;
+  topic: string;
 }
 
 interface SkillCand {
@@ -186,7 +185,7 @@ interface SkillCand {
 
 // Resolve a skill to a serving template, chosen uniformly (with the rng)
 // among the skill's primary templates.
-function candFor(skill: string, band: Band, rng: Rng): SkillCand {
+export function candFor(skill: string, band: Band, rng: Rng): SkillCand {
   const all = bySkill(skill);
   if (all.length === 0) throw new Error(`scheduler: no template for ${skill}`);
   const primary = all.filter((t) => t.skill === skill);
@@ -209,7 +208,7 @@ function dropRepeats(cands: SkillCand[], ctx: PickCtx): SkillCand[] {
 
 // Generate for a skill candidate, regenerating up to 5 times to dodge
 // recently seen prompts.
-function serveSkill(cand: SkillCand, ctx: PickCtx, _rng: Rng): Question {
+export function serveSkill(cand: SkillCand, ctx: PickCtx, _rng: Rng): Question {
   const t = TEMPLATE_MAP.get(cand.templateId);
   if (!t) throw new Error(`scheduler: no template for ${cand.skill}`);
   return serveTemplate(t, cand.band, ctx);
@@ -224,7 +223,7 @@ function serveTemplate(t: Template, band: Band, ctx: PickCtx): Question {
   return q;
 }
 
-function serveFact(factId: string, ctx: PickCtx): Question {
+export function serveFact(factId: string, ctx: PickCtx): Question {
   const family = factFamilyOf(factId);
   if (family === null) throw new Error(`scheduler: bad fact id "${factId}"`);
   const templateId = factTemplateFor(family);
@@ -261,136 +260,93 @@ function factFamiliesInPlay(state: State): FactFamily[] {
   return [...inPlay];
 }
 
-export function pickQuestion(
+// One candidate: a topic plus a deferred way to serve the question.
+interface Cand {
+  topic: string;
+  serve: () => { question: Question; transfer: boolean };
+}
+
+function skillCand(c: SkillCand, ctx: PickCtx, rng: Rng, transfer: boolean): Cand {
+  return {
+    topic: c.skill,
+    serve: () => ({ question: serveSkill(c, ctx, rng), transfer }),
+  };
+}
+
+function factCand(factId: string, ctx: PickCtx): Cand {
+  return {
+    topic: factFamilyOf(factId) ?? factId,
+    serve: () => ({ question: serveFact(factId, ctx), transfer: false }),
+  };
+}
+
+// The sheet families whose facts may be introduced as new.
+const NEW_FACT_FAMILIES: FactFamily[] = [
+  'tables',
+  'squares',
+  'fraction-equivalents',
+  'percent-anchors',
+  'complements-10',
+];
+
+const BUCKET_ORDER = ['due', 'target', 'learning', 'newfact', 'maintenance'] as const;
+type MixedBucket = (typeof BUCKET_ORDER)[number];
+
+// The mixed-round pick. Builds the five buckets, rolls the weights, then
+// applies the variety rule inside the chosen bucket and across buckets.
+export function pickMixed(
   state: State,
   rng: Rng,
   now: number,
   ctx: PickCtx,
 ): PickResult {
   if (ctx.nonce === undefined) ctx = { ...ctx, nonce: now };
+  const buckets = new Map<MixedBucket, Cand[]>();
 
-  if (ctx.phase === 'custom') {
-    const pool = (ctx.customSkills ?? []).filter((id) => SKILL_MAP.has(id));
-    const cands = dropRepeats(
-      (pool.length > 0 ? pool : [SKILLS[0]!.id]).map((id) =>
-        candFor(id, ctx.customBand ?? recOf(state, id).level, rng),
-      ),
-      ctx,
-    );
-    const cand = rng.pick(cands);
-    return {
-      question: serveSkill(cand, ctx, rng),
-      bucket: 'custom',
-      transfer: false,
-    };
-  }
-
-  if (ctx.phase === 'recall') {
-    return { ...recallPick(state, rng, now, ctx), transfer: false };
-  }
-
-  if (ctx.phase === 'learn') {
-    if (ctx.target !== null) {
-      const rec = recOf(state, ctx.target);
-      return {
-        question: serveSkill(candFor(ctx.target, rec.level, rng), ctx, rng),
-        bucket: 'target',
-        transfer: false,
-      };
-    }
-    // No target: practice with the transfer weight doubled.
-    return practicePick(state, rng, now, ctx, 2);
-  }
-
-  if (ctx.phase === 'timed') {
-    const eligible = SKILLS.filter((s) => {
-      const r = state.skills[s.id];
-      if (!r) return false;
-      const st = status(r);
-      return (
-        st === 'solid' ||
-        st === 'strong' ||
-        (r.attempts >= 5 && recentAcc(r) >= 0.9)
-      );
-    });
-    if (eligible.length > 0) {
-      const eligible2 = dropRepeats(
-        eligible.map((s) => candFor(s.id, recOf(state, s.id).level, rng)),
-        ctx,
-      );
-      const s = rng.pick(eligible2);
-      return {
-        question: serveSkill(s, ctx, rng),
-        bucket: 'maintenance',
-        transfer: false,
-      };
-    }
-    return { ...recallPick(state, rng, now, ctx), transfer: false };
-  }
-
-  // practice and 'review' (defensive) use the bucket mix.
-  return practicePick(state, rng, now, ctx, 1);
-}
-
-// Recall phase: facts only. Due facts first, then weak ones, then a random
-// fact from a family in play.
-function recallPick(
-  state: State,
-  rng: Rng,
-  now: number,
-  ctx: PickCtx,
-): { question: Question; bucket: Bucket } {
-  const factIds = Object.keys(state.facts).filter(
-    (f) => factFamilyOf(f) !== null,
-  );
-  const due = factIds.filter((f) => isDue(state.facts[f]!, now));
-  const weak = factIds.filter(
-    (f) => state.facts[f]!.attempts > 0 && recentAcc(state.facts[f]!) < 0.8,
-  );
-  let factId: string | undefined;
-  if (due.length > 0) factId = rng.pick(due);
-  else if (weak.length > 0) factId = rng.pick(weak);
-  else {
-    const fams = factFamiliesInPlay(state);
-    const fam = fams.length > 0 ? rng.pick(fams) : 'tables';
-    factId = rng.pick(listFacts(fam));
-  }
-  return { question: serveFact(factId, ctx), bucket: 'fact' };
-}
-
-function practicePick(
-  state: State,
-  rng: Rng,
-  now: number,
-  ctx: PickCtx,
-  transferWeightMult: number,
-): PickResult {
+  // due: skills then facts
   const dueSkills = Object.keys(state.skills)
     .filter((id) => SKILL_MAP.has(id) && isDue(state.skills[id]!, now))
     .map((id) => candFor(id, state.skills[id]!.level, rng));
   const dueFacts = Object.keys(state.facts).filter(
     (f) => factFamilyOf(f) !== null && isDue(state.facts[f]!, now),
   );
+  buckets.set('due', [
+    ...dropRepeats(dueSkills, ctx).map((c) => skillCand(c, ctx, rng, false)),
+    ...dueFacts.map((f) => factCand(f, ctx)),
+  ]);
 
-  const fragilePrereqs: SkillCand[] = [];
-  if (ctx.target !== null) {
-    const t = SKILL_MAP.get(ctx.target);
-    if (t) {
-      const prereqIds = new Set([
-        ...t.prereqs,
-        ...t.prereqs.flatMap((p) => SKILL_MAP.get(p)?.prereqs ?? []),
-      ]);
-      for (const id of prereqIds) {
-        const r = state.skills[id];
-        if (r && isFragile(r)) {
-          fragilePrereqs.push(candFor(id, r.level, rng));
-        }
-      }
-    }
+  // target
+  if (ctx.target !== null && SKILL_MAP.has(ctx.target)) {
+    const rec = recOf(state, ctx.target);
+    const band: Band =
+      rec.streak >= 3 && rec.level < 3 && rng.chance(0.25)
+        ? ((rec.level + 1) as Band)
+        : rec.level;
+    buckets.set('target', [skillCand(candFor(ctx.target, band, rng), ctx, rng, false)]);
+  } else {
+    buckets.set('target', []);
   }
 
-  // Transfer: a solid skill pushed one band up, or an application/mixed-chain
-  // template that carries at least one solid skill tag.
+  // learning: attempted, not solid or strong, not due right now
+  const learning = SKILLS.filter((s) => {
+    const r = state.skills[s.id];
+    if (r === undefined || r.attempts === 0) return false;
+    const st = status(r);
+    return (st === 'learning' || st === 'new') && !isDue(r, now) && bySkill(s.id).length > 0;
+  }).map((s) => candFor(s.id, state.skills[s.id]!.level, rng));
+  buckets.set('learning', dropRepeats(learning, ctx).map((c) => skillCand(c, ctx, rng, false)));
+
+  // newfact: the lowest-index unattempted fact per sheet family
+  const newFacts: Cand[] = [];
+  for (const family of NEW_FACT_FAMILIES) {
+    const first = listFacts(family).find(
+      (f) => (state.facts[f]?.attempts ?? 0) === 0,
+    );
+    if (first !== undefined) newFacts.push(factCand(first, ctx));
+  }
+  buckets.set('newfact', newFacts);
+
+  // maintenance + transfer, carried over from the old practice bucket
   const transferCands: SkillCand[] = [];
   const transferTemplates = new Set<string>();
   for (const s of SKILLS) {
@@ -398,9 +354,7 @@ function practicePick(
     if (!r) continue;
     const st = status(r);
     if (st === 'solid' || st === 'strong') {
-      transferCands.push(
-        candFor(s.id, Math.min(3, r.level + 1) as Band, rng),
-      );
+      transferCands.push(candFor(s.id, Math.min(3, r.level + 1) as Band, rng));
       for (const t of bySkill(s.id)) {
         if (SKILL_MAP.get(t.skill)?.kind === 'application' || t.id === 'mixed-chain') {
           transferTemplates.add(t.id);
@@ -408,7 +362,6 @@ function practicePick(
       }
     }
   }
-
   const maintCands: SkillCand[] = SKILLS.filter((s) => {
     const r = state.skills[s.id];
     return r !== undefined && r.attempts > 0 && unlocked(state, s.id);
@@ -416,119 +369,113 @@ function practicePick(
     .sort((a, b) => recOf(state, a.id).lastSeen - recOf(state, b.id).lastSeen)
     .slice(0, 5)
     .map((s) => candFor(s.id, recOf(state, s.id).level, rng));
-
-  const weights: [Bucket, number, boolean][] = [
-    ['due', 0.25, dueSkills.length + dueFacts.length > 0],
-    ['fragile', 0.2, fragilePrereqs.length > 0],
-    ['target', 0.3, ctx.target !== null],
-    [
-      'transfer',
-      0.15 * transferWeightMult,
-      transferCands.length > 0 || transferTemplates.size > 0,
-    ],
-    ['maintenance', 0.1, maintCands.length > 0],
+  const maint: Cand[] = [
+    ...dropRepeats(transferCands, ctx).map((c) => skillCand(c, ctx, rng, true)),
+    ...dropRepeats(maintCands, ctx).map((c) => skillCand(c, ctx, rng, false)),
   ];
-  const total = weights.reduce((s, [, w, ok]) => s + (ok ? w : 0), 0);
-  let bucket: Bucket = 'maintenance';
+  const tt = [...transferTemplates];
+  if (tt.length > 0 && rng.chance(0.4)) {
+    const tid = rng.pick(tt);
+    const template = TEMPLATE_MAP.get(tid)!;
+    maint.push({
+      topic: template.skill,
+      serve: () => ({
+        question: serveTemplate(template, recOf(state, template.skill).level, ctx),
+        transfer: true,
+      }),
+    });
+  }
+  buckets.set('maintenance', maint);
+
+  const WEIGHTS: Record<MixedBucket, number> = {
+    due: 0.45,
+    target: 0.25,
+    learning: 0.15,
+    newfact: 0.1,
+    maintenance: 0.05,
+  };
+
+  const total = BUCKET_ORDER.reduce(
+    (x, b) => x + (buckets.get(b)!.length > 0 ? WEIGHTS[b] : 0),
+    0,
+  );
+  let chosen: MixedBucket = 'maintenance';
   if (total > 0) {
     let roll = rng.next() * total;
-    for (const [b, w, ok] of weights) {
-      if (!ok) continue;
-      roll -= w;
+    for (const b of BUCKET_ORDER) {
+      const cands = buckets.get(b)!;
+      if (cands.length === 0) continue;
+      roll -= WEIGHTS[b];
       if (roll <= 0) {
-        bucket = b;
+        chosen = b;
         break;
       }
     }
   }
 
-  switch (bucket) {
-    case 'due': {
-      if (dueSkills.length > 0 && (dueFacts.length === 0 || rng.chance(0.5))) {
-        const cand = rng.pick(dropRepeats(dueSkills, ctx));
-        return {
-          question: serveSkill(cand, ctx, rng),
-          bucket,
-          transfer: false,
-        };
+  // Variety: from the chosen bucket, drop lastTopic candidates when at
+  // least one other topic remains. If the bucket is only lastTopic, walk
+  // the bucket order from the chosen one until a different topic appears.
+  const pickFrom = (cands: Cand[]): Cand | null => {
+    const alt = cands.filter((c) => c.topic !== ctx.lastTopic);
+    if (alt.length > 0) return rng.pick(alt);
+    return null;
+  };
+
+  let cand = pickFrom(buckets.get(chosen)!);
+  let bucket: MixedBucket = chosen;
+  if (cand === null) {
+    const start = BUCKET_ORDER.indexOf(chosen);
+    for (let i = 1; i < BUCKET_ORDER.length; i++) {
+      const b = BUCKET_ORDER[(start + i) % BUCKET_ORDER.length]!;
+      cand = pickFrom(buckets.get(b)!);
+      if (cand !== null) {
+        bucket = b;
+        break;
       }
-      if (dueFacts.length > 0) {
-        return {
-          question: serveFact(rng.pick(dueFacts), ctx),
-          bucket,
-          transfer: false,
-        };
-      }
-      break; // fall through to maintenance
     }
-    case 'fragile': {
-      if (fragilePrereqs.length > 0) {
-        const cand = rng.pick(dropRepeats(fragilePrereqs, ctx));
-        return {
-          question: serveSkill(cand, ctx, rng),
-          bucket,
-          transfer: false,
-        };
-      }
-      break;
+  }
+  if (cand === null) {
+    // Every candidate everywhere is lastTopic: repeat is allowed.
+    const first = BUCKET_ORDER.map((b) => buckets.get(b)!).find((c) => c.length > 0);
+    if (first === undefined) {
+      // Nothing at all: serve the first method skill as a backstop.
+      const skill = SKILLS.find((s) => s.kind === 'method')!.id;
+      const c = skillCand(candFor(skill, 0, rng), ctx, rng, false);
+      const q = c.serve();
+      return { question: q.question, bucket: 'maintenance', transfer: false, topic: c.topic };
     }
-    case 'target': {
-      if (ctx.target !== null) {
-        const rec = recOf(state, ctx.target);
-        const band: Band =
-          rec.streak >= 3 && rec.level < 3 && rng.chance(0.25)
-            ? ((rec.level + 1) as Band)
-            : rec.level;
-        return {
-          question: serveSkill(candFor(ctx.target, band, rng), ctx, rng),
-          bucket,
-          transfer: false,
-        };
-      }
-      break;
-    }
-    case 'transfer': {
-      const tt = [...transferTemplates];
-      if (tt.length > 0 && (transferCands.length === 0 || rng.chance(0.5))) {
-        const tid = rng.pick(tt);
-        const template = TEMPLATE_MAP.get(tid)!;
-        const band = recOf(state, template.skill).level;
-        return {
-          question: serveTemplate(template, band, ctx),
-          bucket,
-          transfer: true,
-        };
-      }
-      if (transferCands.length > 0) {
-        const cand = rng.pick(dropRepeats(transferCands, ctx));
-        return {
-          question: serveSkill(cand, ctx, rng),
-          bucket,
-          transfer: true,
-        };
-      }
-      break;
-    }
-    case 'maintenance':
-      break;
+    cand = rng.pick(first);
+    bucket = BUCKET_ORDER.find((b) => buckets.get(b) === first)!;
   }
 
-  // maintenance, or a bucket whose candidates vanished.
-  if (maintCands.length === 0) {
-    const first = SKILLS.find(
-      (s) => s.kind === 'method' && unlocked(state, s.id),
-    );
-    const skill = first?.id ?? 'tables-1-10';
-    return {
-      question: serveSkill(candFor(skill, 0, rng), ctx, rng),
-      bucket: 'maintenance',
-      transfer: false,
-    };
-  }
-  const cand = rng.pick(dropRepeats(maintCands, ctx));
-  return {
-    question: serveSkill(cand, ctx, rng),
-    bucket: 'maintenance',
-    transfer: false,
-  };
+  const out = cand.serve();
+  return { question: out.question, bucket, transfer: out.transfer, topic: cand.topic };
+}
+
+// A 'facts' round serves inside one family: due first, then weak, then
+// unattempted, then a random fact.
+export function pickFactInFamily(
+  state: State,
+  rng: Rng,
+  ctx: PickCtx,
+  family: FactFamily,
+): PickResult {
+  if (ctx.nonce === undefined) ctx = { ...ctx, nonce: 0 };
+  const ids = listFacts(family);
+  const due = ids.filter((f) => {
+    const r = state.facts[f];
+    return r !== undefined && isDue(r, Date.now());
+  });
+  const weak = ids.filter((f) => {
+    const r = state.facts[f];
+    return r !== undefined && r.attempts > 0 && recentAcc(r) < 0.8 && !due.includes(f);
+  });
+  const fresh = ids.filter((f) => state.facts[f] === undefined || state.facts[f]!.attempts === 0);
+  const factId =
+    due.length > 0 ? rng.pick(due)
+    : weak.length > 0 ? rng.pick(weak)
+    : fresh.length > 0 ? rng.pick(fresh)
+    : rng.pick(ids);
+  return { question: serveFact(factId, ctx), bucket: 'fact', transfer: false, topic: family };
 }

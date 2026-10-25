@@ -2,7 +2,7 @@
 
 Live at https://rbsriram.com/mentalmath
 
-A local-first web app that trains mental arithmetic. It generates problems, teaches methods, tracks what you know, and plans a 30 minute daily session. All data stays in your browser.
+A local-first web app that trains mental arithmetic. It generates problems, teaches methods, tracks what you know, and serves short rounds of 10 questions. All data stays in your browser.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ pnpm preview       # serve dist/ locally
 
 ## Keys
 
-- Enter: submit an answer, continue after feedback, start a session.
+- Enter: submit an answer, continue after feedback, start a round.
 - Space: skip an empty answer box; continue after an answer.
 - r: show or hide the worked route after an answer.
 - Esc: stop (progress is kept), close the keys card.
@@ -52,7 +52,7 @@ The repo carries `.github/workflows/pages.yml`. It only matters once a GitHub re
 - `src/lib/engine/` question types, answer checking, the template registry.
 - `src/lib/engine/templates/` 45 problem generators across ten families.
 - `src/lib/content/` skill graph, fact families, method cards, the study sheet (study.ts).
-- `src/lib/learn/` records, scheduler, session, diagnostic, benchmark, progress.
+- `src/lib/learn/` records, scheduler, rounds, diagnostic, benchmark, progress.
 - `src/lib/store/` storage boundary, IndexedDB, export and import.
 - `src/components/` question runner, route display, method cards, bars, fact grids.
 - `src/views/` Today, Practice, Knowledge, Progress.
@@ -63,7 +63,7 @@ The repo carries `.github/workflows/pages.yml`. It only matters once a GitHub re
 ## Docs
 
 - `docs/mental-math-devin-brief.md`: the product brief.
-- `docs/algorithm.md`: how spacing, unlocking, sessions, and benchmarks work.
+- `docs/algorithm.md`: how spacing, unlocking, rounds, and benchmarks work.
 - `docs/content-sources.md`: where the methods came from and what was rejected.
 - `docs/DECISIONS.md`, `docs/STATE.md`: project history and status.
 

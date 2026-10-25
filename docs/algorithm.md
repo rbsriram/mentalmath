@@ -25,7 +25,7 @@ Facts are per item: table entries, squares, complements, fraction equivalents, p
 
 ## Base facts
 
-Base facts are memorized, not derived. The Knowledge view opens with the whole base sheet: the 15 x 15 table, complements for 10, 100, and 1000, squares to 30, the 25 fraction equivalents, and the six percent anchors. Cells are tinted by each fact's status so gaps are visible at a glance. Each block has a Drill button that starts custom practice on that family, and the Recall block still introduces each family once with its fallback-method card.
+Base facts are memorized, not derived. The Knowledge view opens with the whole base sheet: the 15 x 15 table, the five complement pairs to 10, squares to 30, the 25 fraction equivalents, and the six percent anchors. Cells are tinted by each fact's status so gaps are visible at a glance. Each block has a Drill button that starts a round on that family, and each family is introduced once with its method card. Complements to 100 and 1,000 are a rule, not facts: work from the right, keep trailing zeros, subtract the first non-zero digit from 10 and every digit to its left from 9. They are drilled as a method, not memorized.
 
 ## Update rules
 
@@ -54,11 +54,13 @@ A skill unlocks when every practicable prerequisite is known by `knownStar`. The
 
 The daily target is the current target while it stays unlocked and below solid, else the first frontier skill.
 
-## The session
+## The round
 
-Phases in order: recall 3, learn 7, practice 12, timed 5, review 3 minutes. The learn budget moves to practice when no target exists. Recall halves when fewer than five facts exist. Phases end only between questions.
+A round is exactly 10 questions and ends by itself. The app never counts time: there are no minutes, phases, or blocks. Response time is still recorded per answer and still drives speed targets and promotion. Rounds persist in `state.round`, so a reload mid-round continues it; Stop clears it and keeps every recorded answer.
 
-Practice draws from five weighted buckets: due 0.25, fragile 0.20, target 0.30, transfer 0.15, maintenance 0.10. Empty buckets drop out and weights renormalize. Transfer pushes a solid skill one band up or serves an application template that carries a solid skill. Misses enter the review queue and the review phase serves fresh items from the same template and band.
+A mixed round draws from five weighted buckets: due 0.45, target 0.25, learning 0.15, newfact 0.10, maintenance and transfer 0.05. Empty buckets drop out and weights renormalize. Each question has a topic, the fact family for facts and the skill id for skills, and the app never serves the same topic twice in a row while another topic exists. The interleaving is the point: variety keeps a round short and wide instead of deep on one topic. A target method's card shows once before its first target question, and each fact family's card shows once ever, before its first fact.
+
+Round kinds: `mixed` as above, `skill` for a chosen list of skills, and `facts` for one fact family (due first, then weak, then unattempted, then random). Diagnostic parts 2 to 4 run as their own rounds between mixed rounds, alternating until the diagnostic is done. Finishing a run updates the day summary (`days`: rounds, answered, correct) and `lastRoundKind`, which drives what Start serves next.
 
 ## Speed targets
 
@@ -81,9 +83,7 @@ Base seconds, scaled by 1, 1, 1.5, 2 for bands 0 to 3:
 
 Twenty probes in a fixed order. Each starts at band 1, climbs to 2 and 3 on correct answers, drops to a single band 0 item on a band 1 miss, and ends on any band 2 or 3 miss. Skips count as wrong. Finish writes the probed level per skill, seeds stability 3 days for level 1 and up, stores the baseline report, and picks the first target.
 
-The probes run in 4 parts of 5. Part 1 always runs standalone from Today. Once it is in, the remaining parts fold into the daily session as a 5 minute first block, and practice shrinks by 5 minutes. A completed part applies its levels right away, re-picks the session target, and ends the block at that question boundary. If the 5 minutes end mid-part, the part resumes in the next session. The baseline report still waits for part 4.
-
-The 10 minute plan runs recall for 2 minutes and practice for 8, with no learn, timed, or review phase.
+The probes run in 4 parts of 5. Part 1 always runs standalone from Today. Once it is in, the remaining parts run as diagnostic rounds that alternate with mixed rounds until part 4 completes. A completed part applies its levels right away and re-picks the target. The baseline report still waits for part 4.
 
 ## The benchmark
 

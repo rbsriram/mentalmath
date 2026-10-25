@@ -57,15 +57,11 @@
     const s0 = rec ? status(rec) : 'new';
     return `st-${s0}`;
   }
-  const DRILLS = {
-    tables: ['tables-1-10', 'tables-11-15'],
-    complements: ['complements-10', 'complements-100', 'complements-1000'],
-    squares: ['squares-1-25', 'squares-26-50'],
-    fractions: ['fraction-equivalents'],
-    anchors: ['percent-anchors'],
-  } as const;
-  function drill(skills: readonly string[]) {
-    startPractice('custom', [...skills], null, false, 'knowledge');
+  function drillFacts(topic: string) {
+    startPractice('round', { kind: 'facts', topic }, 'knowledge');
+  }
+  function drillSkill(skills: string[]) {
+    startPractice('round', { kind: 'skill', skills }, 'knowledge');
   }
 
   // #knowledge/base lands on the sheet without breaking skill details.
@@ -122,7 +118,7 @@
       <MethodCard method={m} />
     {/each}
     {#if practicable(id)}
-      <button onclick={() => startPractice('custom', [id])}>Practice this</button>
+      <button onclick={() => startPractice('round', { kind: 'skill', skills: [id] })}>Practice this</button>
     {/if}
   </div>
 {:else}
@@ -150,19 +146,19 @@
         </tbody>
       </table>
     </div>
-    <button class="secondary" onclick={() => drill(DRILLS.tables)}>Drill</button>
+    <button class="secondary" onclick={() => drillFacts('tables')}>Drill</button>
   </div>
 
   <div class="card">
     <h3 style="margin-top:0">Complements</h3>
-    {#each sheet.complements as comp}
-      <p>
-        <strong>to {comp.base}</strong>
-        <span class="muted">: {comp.rule}</span><br />
-        {#each comp.examples as ex, i}{i > 0 ? ', ' : ''}<span class="comp {tint(`c${comp.base}:${ex.n}`)}">{ex.n} → {ex.complement}</span>{/each}
-      </p>
-    {/each}
-    <button class="secondary" onclick={() => drill(DRILLS.complements)}>Drill</button>
+    <p>
+      {#each sheet.complements.pairs as pr, i}{i > 0 ? ', ' : ''}<span class="comp {tint(pr.factId)}">{pr.a} + {pr.b}</span>{/each}
+    </p>
+    <p class="muted">{sheet.complements.rule}</p>
+    <p>
+      {#each sheet.complements.examples as ex, i}{i > 0 ? ', ' : ''}{ex.n} → {ex.complement}{/each}
+    </p>
+    <button class="secondary" onclick={() => drillSkill(['complements-100', 'complements-1000'])}>Drill</button>
   </div>
 
   <div class="card">
@@ -181,7 +177,7 @@
         </tbody>
       </table>
     </div>
-    <button class="secondary" onclick={() => drill(DRILLS.squares)}>Drill</button>
+    <button class="secondary" onclick={() => drillFacts('squares')}>Drill</button>
   </div>
 
   <div class="card">
@@ -197,7 +193,7 @@
         {/each}
       </tbody>
     </table>
-    <button class="secondary" onclick={() => drill(DRILLS.fractions)}>Drill</button>
+    <button class="secondary" onclick={() => drillFacts('fraction-equivalents')}>Drill</button>
   </div>
 
   <div class="card">
@@ -213,7 +209,7 @@
         {/each}
       </tbody>
     </table>
-    <button class="secondary" onclick={() => drill(DRILLS.anchors)}>Drill</button>
+    <button class="secondary" onclick={() => drillFacts('percent-anchors')}>Drill</button>
   </div>
 
   {#each families as fam}
