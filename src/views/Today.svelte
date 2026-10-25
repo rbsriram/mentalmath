@@ -53,7 +53,7 @@
 
 {#if !started}
   <div class="card">
-    <p>A short placement test comes first, in 4 rounds of 5 probes.</p>
+    <p>A short placement test comes first, in 4 short rounds.</p>
     <ol>
       {#each PART_LABELS as label}
         <li>{label}</li>
